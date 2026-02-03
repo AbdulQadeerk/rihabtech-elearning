@@ -1,0 +1,173 @@
+/* Quill Editor Custom Styles - Fixed for Text Wrapping */
+.quill-editor-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.quill-editor-wrapper .ql-container {
+  font-family: inherit !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.quill-editor-wrapper .ql-editor {
+  word-wrap: break-word !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding: 12px 15px !important;
+  padding-top: 60px !important;
+  min-height: 120px !important;
+}
+
+.quill-editor-wrapper .ql-toolbar {
+  border-top: 1px solid #ccc !important;
+  border-left: 1px solid #ccc !important;
+  border-right: 1px solid #ccc !important;
+  border-bottom: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: white !important;
+  padding: 8px !important;
+}
+
+.quill-editor-wrapper .ql-container {
+  border-bottom: 1px solid #ccc !important;
+  border-left: 1px solid #ccc !important;
+  border-right: 1px solid #ccc !important;
+  border-top: none !important;
+}
+
+/* Force text wrapping on all content */
+.quill-editor-wrapper .ql-editor * {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.quill-editor-wrapper .ql-editor p,
+.quill-editor-wrapper .ql-editor h1,
+.quill-editor-wrapper .ql-editor h2,
+.quill-editor-wrapper .ql-editor h3,
+.quill-editor-wrapper .ql-editor h4,
+.quill-editor-wrapper .ql-editor h5,
+.quill-editor-wrapper .ql-editor h6,
+.quill-editor-wrapper .ql-editor div,
+.quill-editor-wrapper .ql-editor blockquote,
+.quill-editor-wrapper .ql-editor pre {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+/* Fix for inline elements */
+.quill-editor-wrapper .ql-editor strong,
+.quill-editor-wrapper .ql-editor em,
+.quill-editor-wrapper .ql-editor span,
+.quill-editor-wrapper .ql-editor a {
+  display: inline !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
+/* Ensure the editor container doesn't overflow */
+.quill-editor-wrapper .ql-editor.ql-blank::before {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
+  white-space: pre-wrap !important;
+}
+
+/* Ensure toolbar buttons remain visible and accessible */
+.quill-editor-wrapper .ql-toolbar .ql-formats {
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+.quill-editor-wrapper .ql-toolbar button {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  padding: 4px 6px !important;
+  margin: 0 1px !important;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s !important;
+}
+
+.quill-editor-wrapper .ql-toolbar button:hover {
+  background-color: #f0f0f0 !important;
+}
+
+.quill-editor-wrapper .ql-toolbar button.ql-active {
+  background-color: #e6f3ff !important;
+  border-color: #b3d9ff !important;
+}
+
+/* Ensure toolbar dropdowns work properly */
+.quill-editor-wrapper .ql-toolbar .ql-picker {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  position: relative !important;
+}
+
+.quill-editor-wrapper .ql-toolbar .ql-picker-label {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  padding: 4px 6px !important;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+}
+
+.quill-editor-wrapper .ql-toolbar .ql-picker-label:hover {
+  background-color: #f0f0f0 !important;
+}
+
+/* Make sure the toolbar doesn't scroll with content */
+.quill-editor-wrapper .ql-container {
+  position: relative !important;
+}
+
+.quill-editor-wrapper .ql-editor {
+  position: relative !important;
+}
+
+/* Ensure content area is properly spaced below sticky toolbar */
+.quill-editor-wrapper .ql-editor.ql-blank::before {
+  padding-top: 60px !important;
+}
+
+/* Fix for when content is present */
+.quill-editor-wrapper .ql-editor p:first-child,
+.quill-editor-wrapper .ql-editor h1:first-child,
+.quill-editor-wrapper .ql-editor h2:first-child,
+.quill-editor-wrapper .ql-editor h3:first-child,
+.quill-editor-wrapper .ql-editor div:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}

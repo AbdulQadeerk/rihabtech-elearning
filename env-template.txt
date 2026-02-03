@@ -1,0 +1,25 @@
+# Bunny.net Configuration
+# Copy this content to a .env file in your project root and fill in your actual values
+
+# Bunny Stream Configuration (for video uploads)
+REACT_APP_BUNNY_LIBRARY_ID=583461
+REACT_APP_BUNNY_API_KEY=66115f44-5a8f-4db5-a631c8d48ef3-4fd0-40a7
+REACT_APP_BUNNY_CDN_HOSTNAME=vz-232b1154-bc1.b-cdn.net
+
+# Bunny Storage Configuration (for images and documents)
+REACT_APP_BUNNY_STORAGE_ZONE=rihaab
+REACT_APP_BUNNY_STORAGE_PASSWORD=591fed2c-2294-423e-87a540caba58-d0a2-4012
+REACT_APP_BUNNY_STORAGE_HOSTNAME=storage.bunnycdn.com
+
+# Note: All credentials are required for full functionality
+# - Stream credentials are used for video uploads (transcoding + CDN delivery)
+# - Storage credentials are used for images and document uploads
+
+# ========================================
+# LEGACY: Cloudinary Configuration (DEPRECATED)
+# These are no longer used - kept for reference only
+# ========================================
+# REACT_APP_CLOUDINARY_CLOUD_NAME=dg9yh82rf
+# REACT_APP_CLOUDINARY_UPLOAD_PRESET=rihaab
+# REACT_APP_CLOUDINARY_API_KEY=your_api_key_here
+# REACT_APP_CLOUDINARY_API_SECRET=your_api_secret_here
