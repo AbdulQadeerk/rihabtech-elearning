@@ -9,12 +9,7 @@ const GOOGLE_LOGIN_ENDPOINT = `${API_BASE_URL}auth/google/login`;
 // after adding/modifying .env file
 const resolveEnvClientId = () => {
   // CRA style
-  const fromProcess = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-  // Vite style (guard to avoid TS errors if import.meta is not present)
-  const fromImportMeta =
-    typeof import.meta !== 'undefined' &&
-    (import.meta as any)?.env?.VITE_GOOGLE_CLIENT_ID;
-  return fromProcess || fromImportMeta || '';
+  return process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 };
 
 export const GOOGLE_CONFIG = {
@@ -28,11 +23,9 @@ export const GOOGLE_CONFIG = {
 // Debug: Log client ID status (remove in production)
 if (typeof window !== 'undefined') {
   const processEnv = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-  const importMetaEnv = typeof import.meta !== 'undefined' ? (import.meta as any)?.env?.VITE_GOOGLE_CLIENT_ID : undefined;
   console.log('Google Client ID loaded:', !!GOOGLE_CONFIG.clientId,
     GOOGLE_CONFIG.clientId ? `${GOOGLE_CONFIG.clientId.substring(0, 20)}...` : 'NOT SET');
   console.log('Debug - process.env.REACT_APP_GOOGLE_CLIENT_ID:', processEnv || 'undefined');
-  console.log('Debug - import.meta.env.VITE_GOOGLE_CLIENT_ID:', importMetaEnv || 'undefined');
   console.log('Debug - resolved value:', GOOGLE_CONFIG.clientId || 'empty string');
 }
 
