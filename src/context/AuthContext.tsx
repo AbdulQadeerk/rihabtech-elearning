@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { fetchPublicSettings } from '../lib/configService';
 
 // Custom user type that includes both Firebase and localStorage user data
 interface CustomUser {
@@ -27,8 +28,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  logout: async () => {},
-  refreshAuth: () => {},
+  logout: async () => { },
+  refreshAuth: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (tokenData) {
         const userData = JSON.parse(tokenData);
         console.log('Found user in localStorage:', userData);
-        
+
         // Create a standardized user object
         const customUser: CustomUser = {
           uid: userData.id?.toString() || userData.Id?.toString() || 'localStorage-user',
@@ -57,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           AccessToken: userData.AccessToken,
           ProfileImage: userData.ProfileImage || userData.profileImage,
         };
-        
+
         setUser(customUser);
         setLoading(false);
         return;
@@ -71,11 +72,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Even if there's an error, we should set loading to false
       setLoading(false);
     }
-    
+
     // If no localStorage user, the Firebase listener will handle it
   };
 
   useEffect(() => {
+    // Fetch public settings (Google, Razorpay, Firebase) at startup
+    fetchPublicSettings().then(() => {
+      console.log('Public settings loaded');
+      // If needed, can trigger a re-render or re-initialization here
+    });
+
     // Check localStorage first
     checkAuthState();
 
@@ -137,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Error signing out from Firebase:', error);
     }
-    
+
     // Clear localStorage
     localStorage.removeItem('token');
     localStorage.setItem('logoutSuccess', 'true');

@@ -1,3 +1,5 @@
+import { fetchPublicSettings } from './configService';
+
 // Razorpay configuration and utilities
 export interface RazorpayOptions {
   key: string;
@@ -39,12 +41,15 @@ export interface RazorpayOrder {
 }
 
 // Razorpay configuration
-export const RAZORPAY_CONFIG = {
-  key_id: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_1234567890', // Replace with your Razorpay key
-  currency: 'INR',
-  theme: {
-    color: '#3B82F6'
-  }
+export const getRazorpayConfig = async () => {
+  const settings = await fetchPublicSettings();
+  return {
+    key_id: settings.razorpayKeyId,
+    currency: settings.currency,
+    theme: {
+      color: '#3B82F6'
+    }
+  };
 };
 
 // Load Razorpay script dynamically
@@ -64,7 +69,10 @@ export const initializeRazorpay = async (): Promise<any> => {
   if (!scriptLoaded) {
     throw new Error('Failed to load Razorpay script');
   }
-  
+
+  // Ensure we have the latest config
+  await fetchPublicSettings();
+
   return (window as any).Razorpay;
 };
 
@@ -77,7 +85,7 @@ export const createRazorpayOrder = async (
   // In a real implementation, this would be a call to your backend
   // For now, we'll simulate the order creation
   const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+
   return {
     id: orderId,
     amount: amount * 100, // Razorpay expects amount in paise
@@ -101,7 +109,7 @@ export const verifyPaymentSignature = async (
     razorpay_order_id,
     razorpay_signature
   });
-  
+
   // For demo purposes, always return true
   // In production, implement proper signature verification
   return true;

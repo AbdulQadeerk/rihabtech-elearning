@@ -1,5 +1,6 @@
+import { fetchPublicSettings } from '../lib/configService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 
 export interface RazorpayConfig {
   keyId: string;
@@ -143,70 +144,39 @@ class ConfigService {
   private cacheExpiry = 5 * 60 * 1000; // 5 minutes
   private lastCacheTime = 0;
 
-  // Get Razorpay configuration from Firebase
+  // Get Razorpay configuration from SQL Backend
   async getRazorpayConfig(): Promise<RazorpayConfig> {
     try {
-      // Check cache first
-      if (this.razorpayConfigCache && this.isCacheValid()) {
-        return this.razorpayConfigCache;
-      }
-
-      // Fetch from Firebase
-      const configQuery = query(
-        collection(db, 'razorpayConfig'),
-        //orderBy('updatedAt', 'desc'),
-        limit(1)
-      );
-
-      const configSnapshot = await getDocs(configQuery);
-
-      if (configSnapshot.empty) {
-        throw new Error('No Razorpay configuration found');
-      }
-
-      const configDoc = configSnapshot.docs[0];
-      const configData = configDoc.data() as RazorpayConfigData;
+      const publicSettings = await fetchPublicSettings();
 
       const config: RazorpayConfig = {
-        keyId: configData.keyId,
-        keySecret: configData.keySecret,
-        currency: configData.currency || 'INR',
+        keyId: publicSettings.razorpayKeyId,
+        keySecret: '', // Don't expose secret to frontend
+        currency: publicSettings.currency || 'INR',
         theme: {
-          color: configData.theme?.color || '#6A5ACD'
+          color: '#3B82F6'
         },
-        isTestMode: configData.isTestMode !== false,
-        webhookSecret: configData.webhookSecret,
-        webhookUrl: configData.webhookUrl,
-        description: configData.description || 'Subscription Payment',
-        prefill: configData.prefill,
-        notes: configData.notes || {
-          platform: 'Rihab Technologies',
-          source: 'admin_panel'
-        }
-      };
-
-      // Cache the configuration
-      this.razorpayConfigCache = config;
-      this.lastCacheTime = Date.now();
-
-      return config;
-    } catch (error) {
-      console.error('Error getting Razorpay config:', error);
-
-      // Return fallback configuration
-      return {
-        keyId: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxxxxxx',
-        keySecret: process.env.REACT_APP_RAZORPAY_KEY_SECRET || 'fallback_secret',
-        currency: 'INR',
-        theme: {
-          color: '#6A5ACD'
-        },
-        isTestMode: true,
+        isTestMode: publicSettings.razorpayKeyId.startsWith('rzp_test_'),
         description: 'Subscription Payment',
         notes: {
           platform: 'Rihab Technologies',
-          source: 'fallback'
+          source: 'learner_app'
         }
+      };
+
+      this.razorpayConfigCache = config;
+      return config;
+    } catch (error) {
+      console.error('Error getting Razorpay config:', error);
+      // Fallback
+      return {
+        keyId: 'rzp_test_xxxxxxxxxxxxx',
+        keySecret: '',
+        currency: 'INR',
+        theme: { color: '#3B82F6' },
+        isTestMode: true,
+        description: 'Subscription Payment',
+        notes: { platform: 'Rihab Technologies', source: 'fallback' }
       };
     }
   }
@@ -294,7 +264,7 @@ class ConfigService {
 
       const templatesSnapshot = await getDocs(templatesQuery);
 
-      const templates: EmailTemplate[] = templatesSnapshot.docs.map(doc => {
+      const templates: EmailTemplate[] = templatesSnapshot.docs.map((doc: any) => {
         const data = doc.data() as EmailTemplateData;
         return {
           id: doc.id,

@@ -1,50 +1,38 @@
 import { API_BASE_URL } from './api';
 import { toast } from 'sonner';
+import { fetchPublicSettings } from './configService';
 
 // Google login endpoint
 const GOOGLE_LOGIN_ENDPOINT = `${API_BASE_URL}auth/google/login`;
 
 // Google OAuth Configuration
-// Note: Environment variables are loaded at build time, so the dev server must be restarted
-// after adding/modifying .env file
-const resolveEnvClientId = () => {
-  // CRA style
-  return process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+export const getGoogleConfig = async () => {
+  const settings = await fetchPublicSettings();
+  return {
+    clientId: settings.googleClientId,
+    redirectUri: typeof window !== 'undefined' ? window.location.origin + '/login' : '',
+    scope: "openid profile email",
+  };
 };
 
 export const GOOGLE_CONFIG = {
-  clientId: resolveEnvClientId(),
-  // Redirect URI - Google OAuth works better with path-based routing
-  // We'll handle hash routing manually after OAuth callback
+  clientId: '', // Will be populated by getGoogleConfig() or init()
   redirectUri: typeof window !== 'undefined' ? window.location.origin + '/login' : '',
   scope: "openid profile email",
 };
-
-// Debug: Log client ID status (remove in production)
-if (typeof window !== 'undefined') {
-  const processEnv = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-  console.log('Google Client ID loaded:', !!GOOGLE_CONFIG.clientId,
-    GOOGLE_CONFIG.clientId ? `${GOOGLE_CONFIG.clientId.substring(0, 20)}...` : 'NOT SET');
-  console.log('Debug - process.env.REACT_APP_GOOGLE_CLIENT_ID:', processEnv || 'undefined');
-  console.log('Debug - resolved value:', GOOGLE_CONFIG.clientId || 'empty string');
-}
 
 // Google OAuth Helper Functions
 export const GoogleAuth = {
   // Initialize Google OAuth
   init: async () => {
-    // Try to fetch Client ID from backend
     try {
-      const response = await fetch(`${API_BASE_URL}auth/google/client-id`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.clientId) {
-          console.log('✅ Fetched Google Client ID from backend:', data.clientId.substring(0, 10) + '...');
-          GOOGLE_CONFIG.clientId = data.clientId;
-        }
+      const settings = await fetchPublicSettings();
+      if (settings.googleClientId) {
+        console.log('✅ Fetched Google Client ID from backend:', settings.googleClientId.substring(0, 10) + '...');
+        GOOGLE_CONFIG.clientId = settings.googleClientId;
       }
     } catch (error) {
-      console.warn('Failed to fetch Google Client ID from backend, falling back to env/config:', error);
+      console.warn('Failed to fetch Google Client ID from backend:', error);
     }
 
     return new Promise((resolve) => {
@@ -152,28 +140,20 @@ export const GoogleAuth = {
   // Sign in with Google
   signIn: () => {
     console.log('Google sign in initiated...');
-    console.log('Current URL:', window.location.href);
-    console.log('Redirect URI:', GOOGLE_CONFIG.redirectUri);
-    // Use OAuth 2.0 flow directly for better compatibility
     GoogleAuth.signInWithOAuth2();
   },
 
   // Fallback OAuth 2.0 flow
-  signInWithOAuth2: () => {
-    // Check environment variable directly as well (in case GOOGLE_CONFIG wasn't updated)
-    const clientId = resolveEnvClientId();
+  signInWithOAuth2: async () => {
+    const settings = await fetchPublicSettings();
+    const clientId = settings.googleClientId;
 
-    // Validate client ID before proceeding
-    if (!clientId || clientId.trim() === '') {
+    if (!clientId) {
       console.error('Google Client ID is not configured.');
-      console.error('Current value:', clientId);
-      console.error('Please ensure REACT_APP_GOOGLE_CLIENT_ID is set in .env file and restart the dev server.');
-      toast.error('Google authentication is not configured. Please set REACT_APP_GOOGLE_CLIENT_ID and restart the server.');
+      toast.error('Google authentication is not configured.');
       return;
     }
 
-    // Use path-based redirect URI (Google OAuth prefers this)
-    // After OAuth, we'll redirect to hash route manually
     const redirectUri = window.location.origin + '/login';
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -184,106 +164,54 @@ export const GoogleAuth = {
       `access_type=offline&` +
       `prompt=consent`;
 
-    console.log('Redirecting to Google OAuth');
-    console.log('Client ID configured:', !!clientId);
-    console.log('Redirect URI:', redirectUri);
-    console.log('Full OAuth URL:', authUrl);
     window.location.href = authUrl;
   },
 
   // Handle OAuth 2.0 callback
   handleOAuth2Callback: async () => {
-    console.log('OAuth 2.0 Callback handler called');
-    console.log('Current URL:', window.location.href);
-    console.log('Search params:', window.location.search);
-    console.log('Hash:', window.location.hash);
-
-    // Google redirects to: http://localhost:3000/?code=...&state=...#/login
-    // So the code will be in the query parameters (before the hash)
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
     const code = urlParams.get('code') || hashParams.get('code');
     const error = urlParams.get('error') || hashParams.get('error');
 
-    console.log('OAuth 2.0 Callback - Code:', code, 'Error:', error);
-
     if (error) {
-      console.error('OAuth 2.0 Error:', error);
-      toast.error('Google authentication failed. Please try again.');
-      // Clean up URL and redirect to login
-      const cleanUrl = window.location.origin + '/#/login';
-      window.history.replaceState({}, '', cleanUrl);
+      toast.error('Google authentication failed.');
       window.location.hash = '/login';
       return;
     }
 
-    if (!code) {
-      console.warn('No OAuth code found in URL');
-      return;
-    }
+    if (!code) return;
 
-    // Validate client ID and secret (check environment variables directly)
-    const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || GOOGLE_CONFIG.clientId;
-    const clientSecret = process.env.REACT_APP_GOOGLE_CLIENT_SECRET;
+    try {
+      const redirectUri = window.location.origin + '/login';
 
-    if (!clientId || clientId.trim() === '') {
-      console.error('Google Client ID is not configured');
-      toast.error('Google authentication is not configured. Please set REACT_APP_GOOGLE_CLIENT_ID and restart the server.');
-      return;
-    }
+      const response = await fetch(`${API_BASE_URL}auth/google/callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code,
+          redirectUri: redirectUri
+        }),
+      });
 
-    if (!clientSecret || clientSecret.trim() === '') {
-      console.error('Google Client Secret is not configured');
-      toast.error('Google authentication is not configured. Please set REACT_APP_GOOGLE_CLIENT_SECRET and restart the server.');
-      return;
-    }
-
-    if (code) {
-      try {
-        console.log('Processing OAuth code with backend...');
-
-        // Use the same redirect URI that was used in the auth request
-        const redirectUri = window.location.origin + '/login';
-
-        // Exchange authorization code for access token
-        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            code: code,
-            grant_type: 'authorization_code',
-            redirect_uri: redirectUri,
-          }),
-        });
-
-        if (!tokenResponse.ok) {
-          throw new Error('Failed to exchange code for token');
-        }
-
-        const tokenData = await tokenResponse.json();
-        console.log('Token data received from Google');
-
-        // Process access token with backend API (backend will fetch user info using token)
-        await GoogleAuth.processAccessTokenWithBackend(tokenData.access_token);
-
-      } catch (error: any) {
-        console.error('Error processing OAuth callback:', error);
-        const errorMessage = error?.message || 'Authentication failed. Please try again.';
-        console.error('Error details:', error);
-        toast.error(errorMessage);
-        // Redirect to hash route and clean up URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('code');
-        url.searchParams.delete('state');
-        url.pathname = '/';
-        url.search = '';
-        url.hash = '/login';
-        window.history.replaceState({}, '', url.toString());
+      if (!response.ok) {
+        throw new Error('Failed to authenticate with backend');
       }
+
+      const userData = await response.json();
+      localStorage.setItem('token', typeof userData === 'string' ? userData : JSON.stringify(userData));
+      toast.success('Login successful!');
+
+      setTimeout(() => {
+        window.location.replace(window.location.origin + '/#/learner/homepage');
+      }, 500);
+
+    } catch (error: any) {
+      console.error('Error processing OAuth callback:', error);
+      toast.error('Authentication failed. Please try again.');
+      window.location.hash = '/login';
     }
   },
 

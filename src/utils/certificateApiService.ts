@@ -112,5 +112,12 @@ export const certificateApiService = {
       validUntil: cert.validUntil ? new Date(cert.validUntil) : undefined,
     };
   },
+
+  downloadCertificateFile: async (certificateId: number): Promise<Blob> => {
+    const response = await apiClient.get(`/certificate/download-file/${certificateId}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
 };
 
