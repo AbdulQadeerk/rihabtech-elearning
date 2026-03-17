@@ -12,8 +12,8 @@
 // }
 
 // export { API_BASE_URL };
-//export const API_BASE_URL_IMG = 'https://zktutorials.baawanerp.com/';
-//export const API_BASE_URL = 'https://zktutorials.baawanerp.com/api/1/';
+export const API_BASE_URL_IMG = 'https://zktutorials.baawanerp.com/';
+export const API_BASE_URL = 'https://zktutorials.baawanerp.com/api/1/';
 // export const API_BASE_URL = 'https://103.87.175.111:8152/api/1/';
-export const API_BASE_URL_IMG = 'https://localhost:7219/';
-export const API_BASE_URL = 'https://localhost:7219/api/1/';
+//export const API_BASE_URL_IMG = 'https://localhost:7219/';
+//export const API_BASE_URL = 'https://localhost:7219/api/1/';
