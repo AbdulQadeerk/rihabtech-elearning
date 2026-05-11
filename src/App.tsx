@@ -40,9 +40,9 @@ function App() {
     });
     
     // Handle OAuth callback on app load (before routing)
-    // This catches path-based redirects from Google (/login?code=...)
-    if (window.location.pathname === '/login' && window.location.search.includes('code=')) {
-      console.log('🔵 App-level: Detected OAuth callback on /login path');
+    // This catches path-based redirects from Google (/?code=...)
+    if (window.location.search.includes('code=')) {
+      console.log('🔵 App-level: Detected OAuth callback on root path');
       // Convert to hash route for HashRouter
       const search = window.location.search;
       window.location.hash = `/login${search}`;

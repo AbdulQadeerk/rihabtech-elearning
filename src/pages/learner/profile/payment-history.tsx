@@ -224,7 +224,7 @@ const PaymentHistory: React.FC<PaymentHistoryProps> = ({ profile }) => {
         
         <div class="footer">
           <p>Thank you for your payment!</p>
-          <p>For support, contact: support@zktutorials.com</p>
+          <p>For support, contact: connect@zktutorials.com</p>
         </div>
       </body>
       </html>

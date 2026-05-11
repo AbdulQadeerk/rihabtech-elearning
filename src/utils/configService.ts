@@ -214,7 +214,7 @@ class ConfigService {
         mailgun: settingsData.mailgun,
         from: settingsData.from || {
           name: 'Rihab Technologies',
-          email: 'noreply@rihabtech.com'
+          email: 'connect@zktutorials.com'
         },
         replyTo: settingsData.replyTo
       };
@@ -235,13 +235,13 @@ class ConfigService {
           port: 587,
           secure: false,
           auth: {
-            user: 'noreply@rihabtech.com',
+            user: 'connect@zktutorials.com',
             pass: 'fallback_password'
           }
         },
         from: {
           name: 'Rihab Technologies',
-          email: 'noreply@rihabtech.com'
+          email: 'connect@zktutorials.com'
         }
       };
     }

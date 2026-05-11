@@ -48,19 +48,20 @@ export default function ContactUs() {
           <div className="mb-8">
             <h3 className=" text-[#181818] text-lg font-semibold font-['Spartan'] leading-relaxed mb-2">Address</h3>
             <p className="text-gray-600">
-              ZK Tutorials, 484 Old Bazar Khadki Pune,<br />
-              Maharashtra India
+              Spacelance, 204, First Floor, Sapphire Chambers,<br />
+              Baner Road, Baner, Pune,<br />
+              Maharashtra, India 411045
             </p>
           </div>
           
           <div className="mb-8">
             <h3 className=" text-[#181818] text-lg font-semibold font-['Spartan'] leading-relaxed mb-2">Email</h3>
-            <p className="text-[#181818] text-[15px] font-normal font-['Poppins'] leading-relaxed">support@zktutorials.com</p>
+            <p className="text-[#181818] text-[15px] font-normal font-['Poppins'] leading-relaxed">connect@zktutorials.com</p>
           </div>
           
           <div className="mb-8">
             <h3 className=" text-[#181818] text-lg font-semibold font-['Spartan'] leading-relaxed mb-2">Phone</h3>
-            <p className="text-[#181818] text-[15px] font-normal font-['Poppins'] leading-relaxed">(+91)-8956444784</p>
+            <p className="text-[#181818] text-[15px] font-normal font-['Poppins'] leading-relaxed">+91 8956444784</p>
           </div>
           
           <div className="flex space-x-4 mt-8">

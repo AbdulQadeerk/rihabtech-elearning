@@ -141,10 +141,10 @@ export default function Pricing() {
     setIsPaymentModalOpen(false);
     setSelectedPlan(null);
     await refreshActiveSubscription();
-    
+
     // Dispatch event to refresh header subscriptions
     window.dispatchEvent(new CustomEvent('subscriptionUpdated'));
-    
+
     const redirectUrl = localStorage.getItem("redirectAfterSubscription");
     window.location.hash = redirectUrl || "#/learner/homepage";
   };
@@ -157,44 +157,22 @@ export default function Pricing() {
     if (plan.generalFeatures && plan.generalFeatures.length > 0) {
       return plan.generalFeatures.map((f: string) => ({ text: f }));
     }
-    const baseFeatures = [
-      { text: "Access to all courses in selected category" },
-      { text: "HD video quality" },
-      { text: "Mobile and desktop access" },
-      { text: "Certificate upon completion" },
-      { text: "24/7 customer support" },
-    ];
-    const duration = typeof plan.duration === "string" ? parseInt(plan.duration) : (plan.duration || 0);
-    if (duration >= 6) {
-      baseFeatures.push({ text: "Priority customer support" });
-      baseFeatures.push({ text: "Exclusive content access" });
-    }
-    if (duration >= 12) {
-      baseFeatures.push({ text: "All premium features included" });
-      baseFeatures.push({ text: "Early access to new courses" });
-    }
-    return baseFeatures;
+    return [];
   };
 
   const getKeyFeatures = (plan: PricingPlan) => {
     if (plan.keyFeatures && plan.keyFeatures.length > 0) {
       return plan.keyFeatures.map((f: string) => ({ text: f }));
     }
-    return [
-      { text: "Unlimited course access" },
-      { text: "Downloadable resources" },
-      { text: "Progress tracking" },
-      { text: "Community forum access" },
-      { text: "Regular content updates" },
-    ];
+    return [];
   };
 
-const filteredPlans = pricingPlans.filter((plan) => {
-  if (selectedCategory === "all") {
-    return !plan.categoryId; // only plans without a category
-  }
-  return plan.categoryId === selectedCategory; // plans matching the selected category
-});
+  const filteredPlans = pricingPlans.filter((plan) => {
+    if (selectedCategory === "all") {
+      return !plan.categoryId; // only plans without a category
+    }
+    return plan.categoryId === selectedCategory; // plans matching the selected category
+  });
 
   if (loading) {
     return (
@@ -217,11 +195,10 @@ const filteredPlans = pricingPlans.filter((plan) => {
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`px-6 py-2 rounded-full border-2 transition-all ${
-                  selectedCategory === category.id
-                    ? "border-primary bg-primary text-white"
-                    : "border-gray-300 text-gray-700 hover:border-primary hover:text-primary"
-                }`}
+                className={`px-6 py-2 rounded-full border-2 transition-all ${selectedCategory === category.id
+                  ? "border-primary bg-primary text-white"
+                  : "border-gray-300 text-gray-700 hover:border-primary hover:text-primary"
+                  }`}
               >
                 {category.name}
               </button>
@@ -246,11 +223,10 @@ const filteredPlans = pricingPlans.filter((plan) => {
               return (
                 <div
                   key={plan.id}
-                  className={`rounded-3xl p-8 ${
-                    isCurrentPlan
-                      ? "bg-white rounded-[44px] shadow-[0px_24px_83px_0px_rgba(0,0,0,0.10)] transform md:scale-105 z-10"
-                      : "bg-orange-50 rounded-[44px]"
-                  }`}
+                  className={`rounded-3xl p-8 ${isCurrentPlan
+                    ? "bg-white rounded-[44px] shadow-[0px_24px_83px_0px_rgba(0,0,0,0.10)] transform md:scale-105 z-10"
+                    : "bg-orange-50 rounded-[44px]"
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -285,7 +261,7 @@ const filteredPlans = pricingPlans.filter((plan) => {
                     <p className="text-sm text-gray-500 mt-1">Total Price (Tax Inclusive)</p>
                   </div>
 
-                  
+
 
                   {/* Action button */}
                   <div className="mt-6">
@@ -316,17 +292,19 @@ const filteredPlans = pricingPlans.filter((plan) => {
                     ))}
                   </ul>
 
-                  <div className="mt-6">
-                    <h4 className="font-medium text-gray-800 mb-3">Key Features</h4>
-                    <ul className="space-y-3">
-                      {getKeyFeatures(plan).map((feature, idx) => (
-                        <li key={idx} className="flex items-center text-sm text-gray-700">
-                          <Check className="h-5 w-5 text-black mr-2 flex-shrink-0" />
-                          {feature.text}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  {getKeyFeatures(plan).length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-medium text-gray-800 mb-3">Key Features</h4>
+                      <ul className="space-y-3">
+                        {getKeyFeatures(plan).map((feature, idx) => (
+                          <li key={idx} className="flex items-center text-sm text-gray-700">
+                            <Check className="h-5 w-5 text-black mr-2 flex-shrink-0" />
+                            {feature.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               );
             })}

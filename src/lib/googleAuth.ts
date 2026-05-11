@@ -10,14 +10,14 @@ export const getGoogleConfig = async () => {
   const settings = await fetchPublicSettings();
   return {
     clientId: settings.googleClientId,
-    redirectUri: typeof window !== 'undefined' ? window.location.origin + '/login' : '',
+    redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
     scope: "openid profile email",
   };
 };
 
 export const GOOGLE_CONFIG = {
   clientId: '', // Will be populated by getGoogleConfig() or init()
-  redirectUri: typeof window !== 'undefined' ? window.location.origin + '/login' : '',
+  redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
   scope: "openid profile email",
 };
 
@@ -154,7 +154,7 @@ export const GoogleAuth = {
       return;
     }
 
-    const redirectUri = window.location.origin + '/login';
+    const redirectUri = window.location.origin;
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(clientId)}&` +
@@ -183,7 +183,7 @@ export const GoogleAuth = {
     if (!code) return;
 
     try {
-      const redirectUri = window.location.origin + '/login';
+      const redirectUri = window.location.origin;
 
       const response = await fetch(`${API_BASE_URL}auth/google/callback`, {
         method: 'POST',

@@ -323,15 +323,18 @@ const EducationLandingPage: React.FC = () => {
               <ul className="space-y-4 text-gray-400">
                 <li className="flex items-start">
                   <span className="mr-3">📍</span>
-                  <span>123 Street Name, City, Country</span>
+                  <span>
+                    Spacelance, 204, First Floor, Sapphire Chambers,<br />
+                    Baner Road, Baner, Pune, Maharashtra, India 411045
+                  </span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-3">📧</span>
-                  <span>support@edulearn.com</span>
+                  <span>connect@zktutorials.com</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-3">📞</span>
-                  <span>+1 234 567 8900</span>
+                  <span>+91 8956444784</span>
                 </li>
               </ul>
             </div>

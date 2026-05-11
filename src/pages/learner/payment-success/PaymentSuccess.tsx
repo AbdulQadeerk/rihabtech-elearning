@@ -182,10 +182,10 @@ const PaymentSuccess: React.FC = () => {
             <p className="text-xs text-gray-500">
               Need help? Contact our support team at{" "}
               <a
-                href="mailto:support@rihabtech.com"
+                href="mailto:connect@zktutorials.com"
                 className="text-primary hover:underline"
               >
-                support@rihabtech.com
+                connect@zktutorials.com
               </a>
             </p>
           </div>
