@@ -355,7 +355,7 @@ const getInitialLecture = (index: number): LectureItem => ({
   contentUrl: "",
   published: true, // Default to published
   description: "", // Add description field
-  isPromotional: true, // Default to promotional for free preview
+  isPromotional: false, // Default to NOT promotional - only first lecture of first section should be free preview
   duration: 0, // Default duration for external videos
   seqNo: index,
 });
@@ -984,6 +984,24 @@ const normalizeSeqNo = (curriculum: any) => {
   // First transform API data to form structure
   const transformed = transformApiCurriculumToForm(curriculum);
 
+  // Ensure only the first lecture of the first section has isPromotional: true (Free Preview)
+  if (transformed.sections && transformed.sections.length > 0) {
+    let firstLectureSet = false;
+    transformed.sections.forEach((section: any, sectionIdx: number) => {
+      if (section.items && section.items.length > 0) {
+        section.items.forEach((item: any) => {
+          if (item.type === 'lecture') {
+            if (!firstLectureSet && sectionIdx === 0) {
+              item.isPromotional = true; // First lecture of first section = free preview
+              firstLectureSet = true;
+            }
+            // Don't force false on other items - respect whatever the user previously set
+          }
+        });
+      }
+    });
+  }
+
   return transformed;
 };
 
@@ -1085,7 +1103,7 @@ export function CourseCarriculam({ onSubmit }: any) {
     sections: [
       {
         name: "Introduction",
-        items: [getInitialLecture(1)],
+        items: [{ ...getInitialLecture(1), isPromotional: true }], // Only the first lecture of the first section gets free preview
         published: true, // Default to published
         seqNo: 1
       },
@@ -4731,7 +4749,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                       resources: [],
                                                       published: true, // Default to published
                                                       description: "", // Add description field
-                                                      isPromotional: true, // Default to promotional for free preview
+                                                      isPromotional: false, // Default to NOT promotional
                                                       seqNo: section.items.length + 1, // Set seqNo based on current items count
                                                     });
                                                     setAddType(null);
@@ -4815,7 +4833,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                               contentText: "",
                               published: true, // Default to published
                               description: "", // Add description field
-                              isPromotional: true, // Default to promotional for free preview
+                              isPromotional: false, // Default to NOT promotional
                               seqNo: 1 // First item in the section
                             },
                           ],
@@ -5017,7 +5035,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                     resources: [],
                     published: true, // Default to published
                     description: '',
-                    isPromotional: true, // Default to promotional for free preview
+                    isPromotional: false, // Default to NOT promotional
                     seqNo: formik.values.sections[sectionIdx].items.length + 1
                   };
 
@@ -5127,7 +5145,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                   articleSource: 'upload' as const,
                   resources: [],
                   published: true, // Default to published
-                  isPromotional: true, // Default to promotional for free preview
+                  isPromotional: false, // Default to NOT promotional
                   seqNo: currentSectionItems.length + 1,
                 };
                 console.log('Created fallback lecture object:', lecture);
@@ -5206,7 +5224,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                     articleSource: 'upload' as const,
                     resources: [],
                     published: true, // Default to published
-                    isPromotional: true, // Default to promotional for free preview
+                    isPromotional: false, // Default to NOT promotional
                     seqNo: currentSectionItems.length + index + 1,
                   };
                 }
@@ -5230,7 +5248,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                   articleSource: 'upload' as const,
                   resources: [],
                   published: true, // Default to published
-                  isPromotional: true, // Default to promotional for free preview
+                  isPromotional: false, // Default to NOT promotional
                   seqNo: currentSectionItems.length + index + 1,
                 };
               })
@@ -5287,7 +5305,7 @@ export function CourseCarriculam({ onSubmit }: any) {
               articleSource: 'upload' as const,
               resources: [],
               published: true, // Default to published
-              isPromotional: true, // Default to promotional for free preview
+              isPromotional: false, // Default to NOT promotional
               seqNo: currentSectionItems.length + idx + 1,
             }));
 
@@ -5351,7 +5369,7 @@ export function CourseCarriculam({ onSubmit }: any) {
               articleSource: 'write' as const,
               resources: [],
               published: true, // Default to published
-              isPromotional: true, // Default to promotional for free preview
+              isPromotional: false, // Default to NOT promotional
               seqNo: currentSectionItems.length + 1,
             };
 
