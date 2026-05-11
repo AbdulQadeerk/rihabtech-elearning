@@ -1115,12 +1115,32 @@ export function CourseCarriculam({ onSubmit }: any) {
     toast.info(`Uploading ${videoFiles.length} video(s)...`);
     setBulkUploadingSection(prev => ({ ...prev, [sectionIdx]: { total: videoFiles.length, completed: 0, uploading: true } }));
 
-    const currentItems = formik.values.sections[sectionIdx]?.items || [];
+    // Remove empty default lecture (no content) before adding uploaded videos
+    const currentItems = [...(formik.values.sections[sectionIdx]?.items || [])];
+    const emptyLectureIndex = currentItems.findIndex(item =>
+      item.type === 'lecture' &&
+      (!item.contentType || (item.contentType as string) === '') &&
+      (!item.contentFiles || item.contentFiles.length === 0) &&
+      (!item.contentUrl || item.contentUrl === '')
+    );
+
+    // If there's an empty lecture, remove it first and update formik
+    let preservedIsPromotional = false;
+    if (emptyLectureIndex !== -1) {
+      preservedIsPromotional = (currentItems[emptyLectureIndex] as any)?.isPromotional || false;
+      const sectionsWithoutEmpty = [...formik.values.sections];
+      sectionsWithoutEmpty[sectionIdx] = {
+        ...sectionsWithoutEmpty[sectionIdx],
+        items: currentItems.filter((_, idx) => idx !== emptyLectureIndex)
+      };
+      formik.setValues({ sections: sectionsWithoutEmpty });
+      // Small delay to let React process the state update
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
 
     for (let i = 0; i < videoFiles.length; i++) {
       const file = videoFiles[i];
       const lectureName = file.name.replace(/\.[^/.]+$/, ''); // Strip file extension
-      const lectureIdx = currentItems.length + i;
 
       // Create temp lecture with uploading status
       const tempLecture = {
@@ -1142,13 +1162,17 @@ export function CourseCarriculam({ onSubmit }: any) {
         resources: [],
         published: true,
         description: lectureName, // Auto-fill description from filename
-        isPromotional: false,
-        seqNo: currentItems.length + i + 1,
+        isPromotional: (i === 0 && preservedIsPromotional) ? true : false, // Preserve free preview from removed empty lecture
+        seqNo: 0, // Will be set below
       };
 
-      // Add lecture immediately to show progress
+      // Append lecture to show progress
       const updatedSections = [...formik.values.sections];
-      updatedSections[sectionIdx].items = [...updatedSections[sectionIdx].items, tempLecture];
+      tempLecture.seqNo = updatedSections[sectionIdx].items.length + 1;
+      updatedSections[sectionIdx] = {
+        ...updatedSections[sectionIdx],
+        items: [...updatedSections[sectionIdx].items, tempLecture]
+      };
       formik.setValues({ sections: updatedSections });
 
       try {
