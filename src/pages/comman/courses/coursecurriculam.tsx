@@ -208,7 +208,7 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
            title: item.lectureName || 'Untitled Lecture',
            type: contentType,
            duration: duration,
-           preview: item.published || false,
+           preview: item.isPromotional || false,
            videoUrl: videoUrl,
            contentFiles: item.contentFiles,
            isPromotional: item.isPromotional || false
@@ -288,7 +288,7 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
                         <span className="text-gray-800">
                           {lecture.title}
                         </span>
-                         {lecture.type === 'video' && lecture.videoUrl && (lecture.isPromotional === true || lecture.preview === true) && (
+                         {lecture.type === 'video' && lecture.videoUrl && (lecture.isPromotional === true) && (
                            <button
                              onClick={() => onPreviewCourse?.()}
                              className="ml-2 px-2 py-1 text-xs text-primary border border-primary rounded hover:bg-primary hover:text-white transition-colors"
@@ -299,8 +299,8 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
                         {lecture.type === 'video' && !lecture.videoUrl && (
                           <span className="ml-2 text-xs text-gray-400">(No preview)</span>
                         )}
-                        {lecture.preview && (
-                          <span className="ml-2 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-full">Preview</span>
+                         {lecture.isPromotional && (
+                          <span className="ml-2 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-full">Preview Video</span>
                         )}
                       </div>
                       <span className="text-gray-500 text-xs font-medium">{lecture.duration}</span>

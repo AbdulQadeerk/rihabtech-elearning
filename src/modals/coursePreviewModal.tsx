@@ -74,7 +74,7 @@ export default function CoursePreviewModal({ isOpen, onClose, course }: CoursePr
             // For free preview, we show videos that are either promotional or published
             if (item.contentType === 'video') {
               // Include videos that are marked as promotional/preview OR published
-              if (item.isPromotional === true || item.published === true) {
+              if (item.isPromotional === true) {
                 console.log('Item is available for preview (promotional or published):', item.lectureName, { isPromotional: item.isPromotional, published: item.published });
 
                 // Handle uploaded videos (with contentFiles)
