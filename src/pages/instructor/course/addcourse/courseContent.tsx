@@ -16,9 +16,25 @@ import { SubmitReviewDialog } from "../../../../components/ui/submitReviewDialog
 import { SubmitRequirementsDialog } from "../../../../components/ui/submitrequiremntdialog";
 import Pricing from "./pricing";
 import CourseCouponsPage from "./coupens";
+import { useCourseData } from "../../../../hooks/useCourseData";
 
 const CourseContent = () => {
-    const [selectedItem, setSelectedItem] = useState("intended-learners");
+    const { courseData } = useCourseData();
+
+    // Smart default tab: If intended learners data already exists, default to curriculum tab
+    const getDefaultTab = () => {
+      if (courseData) {
+        const hasLearn = courseData.learn && courseData.learn.length > 0 && courseData.learn.some((item: string) => item.trim() !== '');
+        const hasRequirements = courseData.requirements && courseData.requirements.length > 0 && courseData.requirements.some((item: string) => item.trim() !== '');
+        const hasTarget = courseData.target && courseData.target.length > 0 && courseData.target.some((item: string) => item.trim() !== '');
+        if (hasLearn && hasRequirements && hasTarget) {
+          return "curriculum";
+        }
+      }
+      return "intended-learners";
+    };
+
+    const [selectedItem, setSelectedItem] = useState(getDefaultTab());
     interface CreationItem {
         id: string;
         icon: JSX.Element;

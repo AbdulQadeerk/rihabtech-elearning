@@ -318,8 +318,24 @@ export default function CourseList() {
         localStorage.removeItem(`curriculum_${course.id}`);
       }
       
-      // Navigate to course title page
-      window.location.hash = '#/instructor/course-title';
+      // Smart navigation: If course already has title, category, and intended learners data,
+      // skip directly to the course-sections page (Curriculum tab) to save time
+      const hasTitle = !!courseData.title && courseData.title.trim() !== '';
+      const hasCategory = !!courseData.category;
+      const hasIntendedLearners = (
+        (courseData.learn && courseData.learn.length > 0 && courseData.learn.some((item: string) => item.trim() !== '')) &&
+        (courseData.requirements && courseData.requirements.length > 0 && courseData.requirements.some((item: string) => item.trim() !== '')) &&
+        (courseData.target && courseData.target.length > 0 && courseData.target.some((item: string) => item.trim() !== ''))
+      );
+
+      if (hasTitle && hasCategory && hasIntendedLearners) {
+        // All prerequisite data exists, go directly to course sections (Curriculum tab)
+        console.log('Course has all prerequisite data, navigating directly to course-sections');
+        window.location.hash = '#/instructor/course-sections';
+      } else {
+        // Missing some data, start from course title page
+        window.location.hash = '#/instructor/course-title';
+      }
     } catch (error) {
       console.error('Error fetching course data:', error);
       toast.error('Failed to load course data. Please try again.');
