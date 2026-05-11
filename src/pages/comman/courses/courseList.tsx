@@ -855,10 +855,6 @@ export function CourseCard({ course, progress = false }: {
                 <User2 size={14} />
                 <span>{formatStudentCount(studentCount)} Students</span>
               </div>
-              <div className="flex items-center gap-1">
-                <BookOpen size={14} />
-                <span>{courseDuration} {courseDuration === 1 ? 'Week' : 'Weeks'}</span>
-              </div>
             </div>
           </div>
           

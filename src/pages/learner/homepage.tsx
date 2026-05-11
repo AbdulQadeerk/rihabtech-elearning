@@ -573,11 +573,6 @@ function CourseCard({ course, progress = false }: { course: CourseGetAllResponse
               {/* <User2 size={16}/> */}
               <span>{course.enrolments} Students</span>
             </div>
-            {/* <Divider/> */}
-            <div className="py-0.5 flex items-center gap-2">
-              {/* <Clock size={16}/> */}
-              <span>{course.weeks} Weeks</span>
-            </div>
           </div>
           <h3 className="course-title">{course.title}</h3>
           <p className="course-desciption">{htmlToText(course.description??'')}</p>

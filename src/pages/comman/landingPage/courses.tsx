@@ -170,11 +170,6 @@ export default function Courses() {
                           <User2 size={16} />
                           <span>{course.enrolments} Students</span>
                         </div>
-                        <Divider />
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} />
-                          <span>{course.weeks} Weeks</span>
-                        </div>
                       </div>
                       <div className="course-description" >{htmlToText(course.description??'')}</div>
                     </div>
