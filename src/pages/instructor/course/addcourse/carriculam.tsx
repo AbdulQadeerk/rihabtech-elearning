@@ -1518,20 +1518,51 @@ export function CourseCarriculam({ onSubmit }: any) {
     console.log("Form initial values updated:", formInitialValues);
   }, [formInitialValues]);
 
-  // Sync lectureName with title/quizTitle for quiz and assignment items
+  // Sync lectureName with title/quizTitle and description for items
   useEffect(() => {
     if (!loading && formik.values.sections) {
       let needsUpdate = false;
       const updatedSections = formik.values.sections.map(section => ({
         ...section,
         items: section.items.map((item: any) => {
+          let updatedItem = { ...item };
+          let itemChanged = false;
+
+          // Sync lectureName for quizzes
           if (item.type === 'quiz' && item.quizTitle && item.lectureName !== item.quizTitle) {
-            needsUpdate = true;
-            return { ...item, lectureName: item.quizTitle };
+            updatedItem.lectureName = item.quizTitle;
+            itemChanged = true;
           }
+          // Sync lectureName for assignments
           if (item.type === 'assignment' && item.title && item.lectureName !== item.title) {
+            updatedItem.lectureName = item.title;
+            itemChanged = true;
+          }
+          
+          // Sync description from lectureName if description is empty OR if it still matches the title (synchronized)
+          if (updatedItem.type === 'quiz') {
+            const currentQuizDesc = item.quizDescription || "";
+            const oldLectureName = item.lectureName || "";
+            if (updatedItem.lectureName && (!currentQuizDesc || currentQuizDesc.trim() === "" || currentQuizDesc === oldLectureName)) {
+              if (updatedItem.quizDescription !== updatedItem.lectureName) {
+                updatedItem.quizDescription = updatedItem.lectureName;
+                itemChanged = true;
+              }
+            }
+          } else {
+            const currentDesc = item.description || "";
+            const oldLectureName = item.lectureName || "";
+            if (updatedItem.lectureName && (!currentDesc || currentDesc.trim() === "" || currentDesc === oldLectureName)) {
+              if (updatedItem.description !== updatedItem.lectureName) {
+                updatedItem.description = updatedItem.lectureName;
+                itemChanged = true;
+              }
+            }
+          }
+
+          if (itemChanged) {
             needsUpdate = true;
-            return { ...item, lectureName: item.title };
+            return updatedItem;
           }
           return item;
         })
@@ -1542,7 +1573,9 @@ export function CourseCarriculam({ onSubmit }: any) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formik.values.sections?.map((s: any) => s.items?.map((i: any) => (i.type === 'quiz' ? i.quizTitle : i.type === 'assignment' ? i.title : '')).join('')).join(''), loading]);
+  }, [formik.values.sections?.map((s: any) => s.items?.map((i: any) => 
+    (i.type === 'quiz' ? i.quizTitle + (i.quizDescription || '') : (i.type === 'assignment' ? i.title : i.lectureName || '') + (i.description || ''))
+  ).join('')).join(''), loading]);
 
   // Update seqNo for all sections and items - runs after drag operations and when items are added/removed
   useEffect(() => {
@@ -2398,7 +2431,15 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                           //style={{ maxWidth: 300 }}
                                                                           name={`sections[${sectionIdx}].items[${itemIdx}].lectureName`}
                                                                           value={item.lectureName}
-                                                                          onChange={formik.handleChange}
+                                                                          onChange={(e) => {
+                                                                            formik.handleChange(e);
+                                                                            const val = e.target.value;
+                                                                            const currentDescription = item.description;
+                                                                            // Sync if description is empty OR if it matches the previous lectureName (synchronized)
+                                                                            if (!currentDescription || currentDescription.trim() === "" || currentDescription === item.lectureName) {
+                                                                              formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].description`, val);
+                                                                            }
+                                                                          }}
                                                                           onBlur={() => setEditLecture(null)}
                                                                           autoFocus
                                                                         />
@@ -3811,7 +3852,15 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                           type="text"
                                                                           name={`sections[${sectionIdx}].items[${itemIdx}].quizTitle`}
                                                                           value={item.quizTitle || ''}
-                                                                          onChange={formik.handleChange}
+                                                                          onChange={(e) => {
+                                                                            formik.handleChange(e);
+                                                                            const val = e.target.value;
+                                                                            const currentDescription = item.quizDescription;
+                                                                            // Sync if description is empty OR if it matches the previous quizTitle (synchronized)
+                                                                            if (!currentDescription || currentDescription.trim() === "" || currentDescription === item.quizTitle) {
+                                                                              formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].quizDescription`, val);
+                                                                            }
+                                                                          }}
                                                                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                           placeholder="Enter quiz title"
                                                                         />
@@ -4148,7 +4197,15 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                           placeholder="Assignment Title"
                                                                           name={`sections[${sectionIdx}].items[${itemIdx}].title`}
                                                                           value={item.title}
-                                                                          onChange={formik.handleChange}
+                                                                          onChange={(e) => {
+                                                                            formik.handleChange(e);
+                                                                            const val = e.target.value;
+                                                                            const currentDescription = item.description;
+                                                                            // Sync if description is empty OR if it matches the previous title (synchronized)
+                                                                            if (!currentDescription || currentDescription.trim() === "" || currentDescription === item.title) {
+                                                                              formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].description`, val);
+                                                                            }
+                                                                          }}
                                                                         />
                                                                       </div>
                                                                       <div>
