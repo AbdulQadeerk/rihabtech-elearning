@@ -1098,6 +1098,121 @@ export function CourseCarriculam({ onSubmit }: any) {
   const [previewContent, setPreviewContent] = useState<{ url: string; name: string; type: string } | null>(null);
   // Ref map to track file inputs for each lecture item
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  // Bulk upload refs and state
+  const bulkUploadRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+  const [bulkUploadingSection, setBulkUploadingSection] = useState<{ [key: number]: { total: number; completed: number; uploading: boolean } }>({});
+
+  // Handle bulk video upload for a section
+  const handleBulkVideoUpload = async (files: FileList, sectionIdx: number) => {
+    if (!files || files.length === 0) return;
+
+    const videoFiles = Array.from(files).filter(f => f.type.startsWith('video/'));
+    if (videoFiles.length === 0) {
+      toast.error('No valid video files selected. Please select video files only.');
+      return;
+    }
+
+    toast.info(`Uploading ${videoFiles.length} video(s)...`);
+    setBulkUploadingSection(prev => ({ ...prev, [sectionIdx]: { total: videoFiles.length, completed: 0, uploading: true } }));
+
+    const currentItems = formik.values.sections[sectionIdx]?.items || [];
+
+    for (let i = 0; i < videoFiles.length; i++) {
+      const file = videoFiles[i];
+      const lectureName = file.name.replace(/\.[^/.]+$/, ''); // Strip file extension
+      const lectureIdx = currentItems.length + i;
+
+      // Create temp lecture with uploading status
+      const tempLecture = {
+        type: 'lecture' as const,
+        lectureName,
+        contentType: 'video' as const,
+        videoSource: 'upload' as const,
+        contentFiles: [{
+          file,
+          url: '',
+          name: file.name,
+          status: 'uploading' as VideoStatus,
+          uploadedAt: new Date(),
+          uploadProgress: 0
+        }],
+        contentUrl: '',
+        contentText: '',
+        articleSource: 'upload' as const,
+        resources: [],
+        published: true,
+        description: lectureName, // Auto-fill description from filename
+        isPromotional: false,
+        seqNo: currentItems.length + i + 1,
+      };
+
+      // Add lecture immediately to show progress
+      const updatedSections = [...formik.values.sections];
+      updatedSections[sectionIdx].items = [...updatedSections[sectionIdx].items, tempLecture];
+      formik.setValues({ sections: updatedSections });
+
+      try {
+        // Upload to Cloudinary
+        const uploadResult = await uploadToCloudinary(file, 'video', (progress) => {
+          const sections = [...formik.values.sections];
+          const itemIndex = sections[sectionIdx].items.length - 1;
+          const item = sections[sectionIdx].items[itemIndex];
+          if (item && item.type === 'lecture' && (item as LectureItem).contentFiles[0]) {
+            (item as LectureItem).contentFiles[0].uploadProgress = progress;
+            formik.setValues({ sections });
+          }
+        });
+
+        // Update lecture with upload result
+        const sections = [...formik.values.sections];
+        const itemIndex = sections[sectionIdx].items.findIndex(
+          (item, idx) => idx >= currentItems.length + i && item.type === 'lecture' && (item as LectureItem).lectureName === lectureName
+        );
+        const realIndex = itemIndex !== -1 ? itemIndex : sections[sectionIdx].items.length - 1;
+        const lecture = sections[sectionIdx].items[realIndex] as LectureItem;
+
+        if (lecture && lecture.type === 'lecture') {
+          lecture.contentUrl = uploadResult.url;
+          lecture.duration = uploadResult.duration || 0;
+          if (lecture.contentFiles[0]) {
+            lecture.contentFiles[0] = {
+              ...lecture.contentFiles[0],
+              url: uploadResult.url,
+              cloudinaryUrl: uploadResult.url,
+              cloudinaryPublicId: uploadResult.publicId,
+              duration: uploadResult.duration || 0,
+              status: 'uploaded' as VideoStatus,
+              uploadProgress: 100
+            };
+          }
+          formik.setValues({ sections });
+        }
+
+        setBulkUploadingSection(prev => ({
+          ...prev,
+          [sectionIdx]: { ...prev[sectionIdx], completed: (prev[sectionIdx]?.completed || 0) + 1 }
+        }));
+
+      } catch (error) {
+        console.error(`Failed to upload ${file.name}:`, error);
+        // Mark as failed
+        const sections = [...formik.values.sections];
+        const failedLecture = sections[sectionIdx].items[sections[sectionIdx].items.length - 1] as LectureItem;
+        if (failedLecture && failedLecture.contentFiles[0]) {
+          failedLecture.contentFiles[0].status = 'failed' as VideoStatus;
+          formik.setValues({ sections });
+        }
+        toast.error(`Failed to upload: ${file.name}`);
+        setBulkUploadingSection(prev => ({
+          ...prev,
+          [sectionIdx]: { ...prev[sectionIdx], completed: (prev[sectionIdx]?.completed || 0) + 1 }
+        }));
+      }
+    }
+
+    setBulkUploadingSection(prev => ({ ...prev, [sectionIdx]: { ...prev[sectionIdx], uploading: false } }));
+    toast.success(`Bulk upload complete! ${videoFiles.length} lecture(s) added.`);
+  };
 
   const initialValues: CurriculumFormValues = {
     sections: [
@@ -4792,14 +4907,39 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                 </Button>
                                               </div>
                                             ) : (
-                                              <div>
+                                              <div className="flex flex-col md:flex-row gap-2 mt-2 items-start">
                                                 <Button
-                                                  className="rounded-none mt-2"
+                                                  className="rounded-none"
                                                   type="button"
                                                   onClick={() => setAddType({ sectionIdx })}
                                                 >
                                                   + Curriculum item
                                                 </Button>
+                                                <Button
+                                                  className="rounded-none"
+                                                  type="button"
+                                                  disabled={bulkUploadingSection[sectionIdx]?.uploading}
+                                                  onClick={() => bulkUploadRefs.current[sectionIdx]?.click()}
+                                                >
+                                                  <UploadCloud size={16} className="mr-1" />
+                                                  {bulkUploadingSection[sectionIdx]?.uploading
+                                                    ? `Uploading ${bulkUploadingSection[sectionIdx]?.completed || 0}/${bulkUploadingSection[sectionIdx]?.total || 0}...`
+                                                    : 'Bulk Upload Videos'
+                                                  }
+                                                </Button>
+                                                <input
+                                                  type="file"
+                                                  multiple
+                                                  accept="video/*"
+                                                  ref={(el) => { bulkUploadRefs.current[sectionIdx] = el; }}
+                                                  style={{ display: 'none' }}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files.length > 0) {
+                                                      handleBulkVideoUpload(e.target.files, sectionIdx);
+                                                      e.target.value = ''; // Reset so same files can be re-selected
+                                                    }
+                                                  }}
+                                                />
                                               </div>
                                             )}
                                           </div>
