@@ -1,7 +1,3 @@
-// import { FaFacebook, FaInstagram, FaTwitter } from 'react-icons/fa';
-
-import { Facebook } from "lucide-react";
-
 const Footer = () => {
   return (
     <footer className="bg-black text-white py-16 font-['Montserrat']">
@@ -29,14 +25,11 @@ const Footer = () => {
           </ul>
 
           <div className="flex gap-4">
-            <a href="#" className="hover:opacity-80 transition-opacity">
-              <img src="Images/icons/facebook sec-.png" alt="Facebook" className="h-6 w-6" />
-            </a>
-            <a href="#" className="hover:opacity-80 transition-opacity">
+            <a href="https://www.instagram.com/zktutorials/" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
               <img src="Images/icons/ant-design_instagram-outlined.png" alt="Instagram" className="h-6 w-6" />
             </a>
-            <a href="#" className="hover:opacity-80 transition-opacity">
-              <img src="Images/icons/twitter sec-.png" alt="Twitter" className="h-6 w-6" />
+            <a href="https://www.youtube.com/@zafarkarnalkar" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+              <img src="Images/icons/youtube.png" alt="YouTube" className="h-6 w-6 object-contain" />
             </a>
           </div>
         </div>
