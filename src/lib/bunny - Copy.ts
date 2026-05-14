@@ -2,13 +2,13 @@
 // Documentation: https://docs.bunny.net/docs/stream-api-overview
 
 // Default configuration (can be overridden by environment variables)
-const BUNNY_LIBRARY_ID = '645326';
-const BUNNY_API_KEY = 'f202436c-cf90-4ce8-a255213b688c-c8a6-4d47';
-const BUNNY_CDN_HOSTNAME = 'vz-59047644-a93.b-cdn.net';
+const BUNNY_LIBRARY_ID = '583461';
+const BUNNY_API_KEY = '66115f44-5a8f-4db5-a631c8d48ef3-4fd0-40a7';
+const BUNNY_CDN_HOSTNAME = 'vz-232b1154-bc1.b-cdn.net';
 
 // Storage Zone configuration (for non-video files like images, documents)
-const BUNNY_STORAGE_ZONE = 'zktutorials';
-const BUNNY_STORAGE_PASSWORD = 'd422a41a-a421-4411-992461794f24-b7eb-4ba5';
+const BUNNY_STORAGE_ZONE = 'rihaab';
+const BUNNY_STORAGE_PASSWORD = '591fed2c-2294-423e-87a540caba58-d0a2-4012';
 const BUNNY_STORAGE_HOSTNAME = 'storage.bunnycdn.com';
 
 export const BUNNY_CONFIG = {

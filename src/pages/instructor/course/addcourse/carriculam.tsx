@@ -302,6 +302,13 @@ interface ViewSectionState {
   sectionIdx: number;
 }
 
+interface BulkVideoItem {
+  file: File;
+  name: string;
+  description: string;
+  isPromotional: boolean;
+}
+
 interface AddTypeState {
   sectionIdx: number;
 }
@@ -1101,9 +1108,12 @@ export function CourseCarriculam({ onSubmit }: any) {
   // Bulk upload refs and state
   const bulkUploadRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [bulkUploadingSection, setBulkUploadingSection] = useState<{ [key: number]: { total: number; completed: number; uploading: boolean } }>({});
+  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
+  const [bulkUploadVideos, setBulkUploadVideos] = useState<BulkVideoItem[]>([]);
+  const [targetSectionIdx, setTargetSectionIdx] = useState<number | null>(null);
 
-  // Handle bulk video upload for a section
-  const handleBulkVideoUpload = async (files: FileList, sectionIdx: number) => {
+  // Handle bulk video upload for a section - Now opens a confirmation dialog first
+  const handleBulkVideoUpload = (files: FileList, sectionIdx: number) => {
     if (!files || files.length === 0) return;
 
     const videoFiles = Array.from(files).filter(f => f.type.startsWith('video/'));
@@ -1112,11 +1122,36 @@ export function CourseCarriculam({ onSubmit }: any) {
       return;
     }
 
-    toast.info(`Uploading ${videoFiles.length} video(s)...`);
-    setBulkUploadingSection(prev => ({ ...prev, [sectionIdx]: { total: videoFiles.length, completed: 0, uploading: true } }));
+    // Map files to our edit state
+    const items: BulkVideoItem[] = videoFiles.map(file => ({
+      file,
+      name: file.name.replace(/\.[^/.]+$/, ''),
+      description: file.name.replace(/\.[^/.]+$/, ''),
+      isPromotional: false
+    }));
+
+    setBulkUploadVideos(items);
+    setTargetSectionIdx(sectionIdx);
+    setShowBulkUploadDialog(true);
+  };
+
+  // Actual upload logic after user confirms in the dialog
+  const startBulkUpload = async () => {
+    if (targetSectionIdx === null || bulkUploadVideos.length === 0) return;
+
+    const sectionIdx = targetSectionIdx;
+    const videoItemsToUpload = [...bulkUploadVideos];
+
+    setShowBulkUploadDialog(false);
+    toast.info(`Uploading ${videoItemsToUpload.length} video(s)...`);
+    setBulkUploadingSection(prev => ({ ...prev, [sectionIdx]: { total: videoItemsToUpload.length, completed: 0, uploading: true } }));
+
+    // Prepare sections and items
+    // Use latest values from Formik
+    let latestSections = [...formik.values.sections];
+    let currentItems = [...(latestSections[sectionIdx]?.items || [])];
 
     // Remove empty default lecture (no content) before adding uploaded videos
-    const currentItems = [...(formik.values.sections[sectionIdx]?.items || [])];
     const emptyLectureIndex = currentItems.findIndex(item =>
       item.type === 'lecture' &&
       (!item.contentType || (item.contentType as string) === '') &&
@@ -1124,81 +1159,68 @@ export function CourseCarriculam({ onSubmit }: any) {
       (!item.contentUrl || item.contentUrl === '')
     );
 
-    // If there's an empty lecture, remove it first and update formik
-    let preservedIsPromotional = false;
     if (emptyLectureIndex !== -1) {
-      preservedIsPromotional = (currentItems[emptyLectureIndex] as any)?.isPromotional || false;
-      const sectionsWithoutEmpty = [...formik.values.sections];
-      sectionsWithoutEmpty[sectionIdx] = {
-        ...sectionsWithoutEmpty[sectionIdx],
-        items: currentItems.filter((_, idx) => idx !== emptyLectureIndex)
-      };
-      formik.setValues({ sections: sectionsWithoutEmpty });
-      // Small delay to let React process the state update
-      await new Promise(resolve => setTimeout(resolve, 50));
+      currentItems = currentItems.filter((_, idx) => idx !== emptyLectureIndex);
     }
 
-    for (let i = 0; i < videoFiles.length; i++) {
-      const file = videoFiles[i];
-      const lectureName = file.name.replace(/\.[^/.]+$/, ''); // Strip file extension
+    // Create and add all temp lectures first to show them in UI
+    const startItemIdx = currentItems.length;
 
-      // Create temp lecture with uploading status
-      const tempLecture = {
-        type: 'lecture' as const,
-        lectureName,
-        contentType: 'video' as const,
-        videoSource: 'upload' as const,
-        contentFiles: [{
-          file,
-          url: '',
-          name: file.name,
-          status: 'uploading' as VideoStatus,
-          uploadedAt: new Date(),
-          uploadProgress: 0
-        }],
-        contentUrl: '',
-        contentText: '',
-        articleSource: 'upload' as const,
-        resources: [],
-        published: true,
-        description: lectureName, // Auto-fill description from filename
-        isPromotional: (i === 0 && preservedIsPromotional) ? true : false, // Preserve free preview from removed empty lecture
-        seqNo: 0, // Will be set below
-      };
+    const newLectures: LectureItem[] = videoItemsToUpload.map((v, i) => ({
+      type: 'lecture' as const,
+      lectureName: v.name,
+      contentType: 'video' as const,
+      videoSource: 'upload' as const,
+      contentFiles: [{
+        file: v.file,
+        url: '',
+        name: v.file.name,
+        status: 'uploading' as VideoStatus,
+        uploadedAt: new Date(),
+        uploadProgress: 0
+      }],
+      contentUrl: '',
+      contentText: '',
+      articleSource: 'upload' as const,
+      resources: [],
+      published: true,
+      description: v.description,
+      isPromotional: v.isPromotional, // Use the user's choice from popup
+      seqNo: startItemIdx + i + 1,
+      isNew: true
+    }));
 
-      // Append lecture to show progress
-      const updatedSections = [...formik.values.sections];
-      tempLecture.seqNo = updatedSections[sectionIdx].items.length + 1;
-      updatedSections[sectionIdx] = {
-        ...updatedSections[sectionIdx],
-        items: [...updatedSections[sectionIdx].items, tempLecture]
-      };
-      formik.setValues({ sections: updatedSections });
+    currentItems = [...currentItems, ...newLectures];
+    latestSections[sectionIdx] = { ...latestSections[sectionIdx], items: currentItems };
+
+    // Update Formik with initial state
+    formik.setFieldValue('sections', latestSections);
+
+    // Process uploads sequentially to avoid overloading and for better UX
+    for (let i = 0; i < videoItemsToUpload.length; i++) {
+      const videoItem = videoItemsToUpload[i];
+      const lectureIdx = startItemIdx + i;
 
       try {
-        // Upload to Cloudinary
-        const uploadResult = await uploadToCloudinary(file, 'video', (progress) => {
-          const sections = [...formik.values.sections];
-          const itemIndex = sections[sectionIdx].items.length - 1;
-          const item = sections[sectionIdx].items[itemIndex];
-          if (item && item.type === 'lecture' && (item as LectureItem).contentFiles[0]) {
-            (item as LectureItem).contentFiles[0].uploadProgress = progress;
-            formik.setValues({ sections });
+        const uploadResult = await uploadToCloudinary(videoItem.file, 'video', (progress) => {
+          // Update progress in Formik - use latestSections to avoid stale state
+          const updatedSections = [...latestSections];
+          if (updatedSections[sectionIdx]?.items[lectureIdx]) {
+            const item = updatedSections[sectionIdx].items[lectureIdx] as LectureItem;
+            if (item.contentFiles && item.contentFiles[0]) {
+              item.contentFiles[0].uploadProgress = progress;
+              formik.setFieldValue('sections', updatedSections);
+            }
           }
         });
 
-        // Update lecture with upload result
-        const sections = [...formik.values.sections];
-        const itemIndex = sections[sectionIdx].items.findIndex(
-          (item, idx) => idx >= currentItems.length + i && item.type === 'lecture' && (item as LectureItem).lectureName === lectureName
-        );
-        const realIndex = itemIndex !== -1 ? itemIndex : sections[sectionIdx].items.length - 1;
-        const lecture = sections[sectionIdx].items[realIndex] as LectureItem;
-
-        if (lecture && lecture.type === 'lecture') {
+        // Update with success
+        latestSections = [...latestSections]; // New reference
+        if (latestSections[sectionIdx]?.items[lectureIdx]) {
+          const lecture = latestSections[sectionIdx].items[lectureIdx] as LectureItem;
           lecture.contentUrl = uploadResult.url;
           lecture.duration = uploadResult.duration || 0;
-          if (lecture.contentFiles[0]) {
+          if (lecture.contentFiles && lecture.contentFiles[0]) {
             lecture.contentFiles[0] = {
               ...lecture.contentFiles[0],
               url: uploadResult.url,
@@ -1209,7 +1231,7 @@ export function CourseCarriculam({ onSubmit }: any) {
               uploadProgress: 100
             };
           }
-          formik.setValues({ sections });
+          formik.setFieldValue('sections', latestSections);
         }
 
         setBulkUploadingSection(prev => ({
@@ -1218,15 +1240,16 @@ export function CourseCarriculam({ onSubmit }: any) {
         }));
 
       } catch (error) {
-        console.error(`Failed to upload ${file.name}:`, error);
-        // Mark as failed
-        const sections = [...formik.values.sections];
-        const failedLecture = sections[sectionIdx].items[sections[sectionIdx].items.length - 1] as LectureItem;
-        if (failedLecture && failedLecture.contentFiles[0]) {
-          failedLecture.contentFiles[0].status = 'failed' as VideoStatus;
-          formik.setValues({ sections });
+        console.error(`Failed to upload ${videoItem.file.name}:`, error);
+        latestSections = [...latestSections]; // New reference
+        if (latestSections[sectionIdx]?.items[lectureIdx]) {
+          const failedLecture = latestSections[sectionIdx].items[lectureIdx] as LectureItem;
+          if (failedLecture.contentFiles && failedLecture.contentFiles[0]) {
+            failedLecture.contentFiles[0].status = 'failed' as VideoStatus;
+            formik.setFieldValue('sections', latestSections);
+          }
         }
-        toast.error(`Failed to upload: ${file.name}`);
+        toast.error(`Failed to upload: ${videoItem.file.name}`);
         setBulkUploadingSection(prev => ({
           ...prev,
           [sectionIdx]: { ...prev[sectionIdx], completed: (prev[sectionIdx]?.completed || 0) + 1 }
@@ -1235,7 +1258,9 @@ export function CourseCarriculam({ onSubmit }: any) {
     }
 
     setBulkUploadingSection(prev => ({ ...prev, [sectionIdx]: { ...prev[sectionIdx], uploading: false } }));
-    toast.success(`Bulk upload complete! ${videoFiles.length} lecture(s) added.`);
+    toast.success(`Bulk upload complete! ${videoItemsToUpload.length} lecture(s) added.`);
+    setBulkUploadVideos([]);
+    setTargetSectionIdx(null);
   };
 
   const initialValues: CurriculumFormValues = {
@@ -1249,7 +1274,7 @@ export function CourseCarriculam({ onSubmit }: any) {
     ],
   };
 
-  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  const [formInitialValues, setFormInitialValues] = useState<CurriculumFormValues | null>(null);
   const [curriculumKey, setCurriculumKey] = useState(0);
   const lastSavedCurriculumRef = useRef<string | null>(null);
   const isSavingRef = useRef(false); // Track if any save operation is in progress
@@ -1321,13 +1346,17 @@ export function CourseCarriculam({ onSubmit }: any) {
         }
 
         // Prioritize API data over localStorage - API is the source of truth
-        if (courseData.curriculum && courseData.curriculum.sections && courseData.curriculum.sections.length > 0) {
-          console.log("Loading curriculum from API:", courseData.curriculum);
+        let apiCurriculum = courseData.curriculum as any;
+        if (typeof apiCurriculum === 'string' && apiCurriculum.trim() !== '') {
+          try { apiCurriculum = JSON.parse(apiCurriculum); } catch (e) {}
+        }
+        if (apiCurriculum && apiCurriculum.sections && apiCurriculum.sections.length > 0) {
+          console.log("Loading curriculum from API:", apiCurriculum);
 
           // Debug: Log seqNo BEFORE sorting
           console.log("BEFORE sorting and normalization:");
-          if (courseData.curriculum.sections) {
-            courseData.curriculum.sections.forEach((section: any, idx: number) => {
+          if (apiCurriculum.sections) {
+            apiCurriculum.sections.forEach((section: any, idx: number) => {
               console.log(`Section ${idx + 1} (${section.name}): seqNo=${section.seqNo}`);
               if (section.items) {
                 section.items.forEach((item: any, itemIdx: number) => {
@@ -1338,7 +1367,7 @@ export function CourseCarriculam({ onSubmit }: any) {
           }
 
           // Sort sections by seqNo and items within sections by seqNo
-          const sortedCurriculum = sortCurriculumBySeqNo(courseData.curriculum);
+          const sortedCurriculum = sortCurriculumBySeqNo(apiCurriculum);
           console.log("AFTER sorting (before normalization):", sortedCurriculum);
 
           // Normalize seqNo and transform API data to form structure
@@ -1371,9 +1400,17 @@ export function CourseCarriculam({ onSubmit }: any) {
           console.log("Saved transformed curriculum to localStorage:", serializableCurriculum);
 
           setFormInitialValues(normalizedCurriculum as unknown as CurriculumFormValues);
+          formik.setValues(normalizedCurriculum as unknown as CurriculumFormValues);
           setCurriculumKey(prev => prev + 1); // Force formik reinitialization
           // Initialize the last saved ref with current curriculum
           lastSavedCurriculumRef.current = JSON.stringify(normalizedCurriculum);
+
+          // Auto-expand all sections
+          const newExpanded: Record<number, boolean> = {};
+          normalizedCurriculum.sections.forEach((_: any, idx: number) => {
+            newExpanded[idx] = true;
+          });
+          setExpandedSections(newExpanded);
         } else {
           // Fallback to localStorage if no API data
           const savedCurriculum = localStorage.getItem(`curriculum_${courseData.id}`);
@@ -1389,8 +1426,16 @@ export function CourseCarriculam({ onSubmit }: any) {
 
             console.log("Normalized curriculum from localStorage:", normalizedCurriculum);
             setFormInitialValues(normalizedCurriculum as unknown as CurriculumFormValues);
+            formik.setValues(normalizedCurriculum as unknown as CurriculumFormValues);
             setCurriculumKey(prev => prev + 1); // Force formik reinitialization
             lastSavedCurriculumRef.current = JSON.stringify(normalizedCurriculum);
+            
+            // Auto-expand all sections
+            const newExpanded: Record<number, boolean> = {};
+            normalizedCurriculum.sections.forEach((_: any, idx: number) => {
+              newExpanded[idx] = true;
+            });
+            setExpandedSections(newExpanded);
           } else {
             console.log("No curriculum data from API or localStorage, checking Firebase fallback");
             // Fallback to Firebase if no API data
@@ -1546,7 +1591,29 @@ export function CourseCarriculam({ onSubmit }: any) {
 
   const formik = useFormik<CurriculumFormValues>({
     enableReinitialize: true,
-    initialValues: formInitialValues,
+    initialValues: (formInitialValues as any) || {
+      sections: [
+        {
+          name: "Introduction",
+          items: [
+            {
+              type: 'lecture',
+              lectureName: "Lecture 1",
+              description: "",
+              contentType: 'video',
+              isPromotional: true,
+              duration: 0,
+              contentFiles: [],
+              resources: [],
+              seqNo: 1,
+              published: true
+            }
+          ],
+          published: true,
+          seqNo: 1
+        },
+      ],
+    },
     validationSchema,
     onSubmit: async (values) => {
       // Prevent duplicate saves
@@ -1695,7 +1762,7 @@ export function CourseCarriculam({ onSubmit }: any) {
             updatedItem.lectureName = item.title;
             itemChanged = true;
           }
-          
+
           // Sync description from lectureName if description is empty OR if it still matches the title (synchronized)
           if (updatedItem.type === 'quiz') {
             const currentQuizDesc = item.quizDescription || "";
@@ -1730,7 +1797,7 @@ export function CourseCarriculam({ onSubmit }: any) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formik.values.sections?.map((s: any) => s.items?.map((i: any) => 
+  }, [formik.values.sections?.map((s: any) => s.items?.map((i: any) =>
     (i.type === 'quiz' ? i.quizTitle + (i.quizDescription || '') : (i.type === 'assignment' ? i.title : i.lectureName || '') + (i.description || ''))
   ).join('')).join(''), loading]);
 
@@ -3648,9 +3715,9 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                                 <div key={fileIdx} className="flex items-center justify-between">
                                                                                   <span className="truncate max-w-48">{file.name}</span>
                                                                                   <span className={`px-2 py-1 rounded text-xs ${file.status === 'uploading' ? 'bg-blue-100 text-blue-800' :
-                                                                                      file.status === 'uploaded' && (file.duration && file.duration > 0) ? 'bg-green-100 text-green-800' :
-                                                                                        file.status === 'uploaded' && (!file.duration || file.duration === 0) ? 'bg-yellow-100 text-yellow-800' :
-                                                                                          'bg-red-100 text-red-800'
+                                                                                    file.status === 'uploaded' && (file.duration && file.duration > 0) ? 'bg-green-100 text-green-800' :
+                                                                                      file.status === 'uploaded' && (!file.duration || file.duration === 0) ? 'bg-yellow-100 text-yellow-800' :
+                                                                                        'bg-red-100 text-red-800'
                                                                                     }`}>
                                                                                     {file.status === 'uploading' ? 'Uploading...' :
                                                                                       file.status === 'uploaded' && (file.duration && file.duration > 0) ? `Duration: ${formatDuration(file.duration)}` :
@@ -5594,6 +5661,87 @@ export function CourseCarriculam({ onSubmit }: any) {
           </DialogContent>
         </Dialog>
       )}
+      {/* Bulk Upload Confirmation Dialog */}
+      <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Confirm Bulk Video Upload</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <p className="text-sm text-gray-500">
+              You have selected {bulkUploadVideos.length} videos. You can edit their names and descriptions before uploading.
+            </p>
+            <div className="space-y-4">
+              {bulkUploadVideos.map((video, idx) => (
+                <div key={idx} className="p-4 border rounded-lg space-y-3 bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <Video size={18} className="text-blue-500" />
+                    <span className="font-medium text-sm truncate flex-1">{video.file.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 h-8 w-8 p-0 hover:bg-red-50"
+                      onClick={() => setBulkUploadVideos(prev => prev.filter((_, i) => i !== idx))}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-gray-700">Lecture Name</label>
+                      <Input
+                        value={video.name}
+                        onChange={(e) => {
+                          const newVideos = [...bulkUploadVideos];
+                          newVideos[idx].name = e.target.value;
+                          setBulkUploadVideos(newVideos);
+                        }}
+                        placeholder="Enter lecture name"
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-gray-700">Description</label>
+                      <Input
+                        value={video.description}
+                        onChange={(e) => {
+                          const newVideos = [...bulkUploadVideos];
+                          newVideos[idx].description = e.target.value;
+                          setBulkUploadVideos(newVideos);
+                        }}
+                        placeholder="Enter description"
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Checkbox
+                      id={`promo-bulk-${idx}`}
+                      checked={video.isPromotional}
+                      onCheckedChange={(checked) => {
+                        const newVideos = [...bulkUploadVideos];
+                        newVideos[idx].isPromotional = !!checked;
+                        setBulkUploadVideos(newVideos);
+                      }}
+                    />
+                    <label htmlFor={`promo-bulk-${idx}`} className="text-xs cursor-pointer font-medium text-gray-600">Free Preview</label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="p-4 border-t bg-gray-50 sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowBulkUploadDialog(false)}>Cancel</Button>
+            <Button
+              onClick={startBulkUpload}
+              disabled={bulkUploadVideos.length === 0}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              Start Uploading
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </FormikProvider>
   );
 }
