@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../../../../components/ui/textarea";
 import { Checkbox } from "../../../../components/ui/checkbox";
 import RichTextEditor from "../../../../components/ui/rich-text-editor";
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../../../components/ui/dialog";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "../../../../components/ui/hover-card";
 // @ts-ignore
@@ -2609,23 +2609,24 @@ export function CourseCarriculam({ onSubmit }: any) {
                                       </span>
                                     </div>
 
-                                    {/* Section Content - Only show when expanded */}
-                                    {expandedSections[sectionIdx] && (
-                                      <FieldArray name={`sections[${sectionIdx}].items`}>
-                                        {({ push, remove, replace }) => (
-                                          <div className="flex flex-col gap-4">
-                                            <Droppable droppableId={`items-${sectionIdx}`} type="ITEM" isDropDisabled={false} isCombineEnabled={false} ignoreContainerClipping={false}>
-                                              {(provided, snapshot) => (
-                                                <div
-                                                  {...provided.droppableProps}
-                                                  ref={provided.innerRef}
-                                                  className={`space-y-2 min-h-[100px] ${snapshot.isDraggingOver ? 'bg-green-50 border-2 border-green-200 border-dashed rounded' : ''
-                                                    }`}
-                                                >
-                                                  {/* Defensive filter for undefined/null items */}
-                                                  {Array.isArray(section.items) && section.items.filter(Boolean).map((item, itemIdx) => (
+                                    {/* Section Content - Droppable is always rendered so it stays registered; items hidden when collapsed */}
+                                    <FieldArray name={`sections[${sectionIdx}].items`}>
+                                      {({ push, remove, replace }) => (
+                                        <div className={expandedSections[sectionIdx] ? 'flex flex-col gap-4' : ''}>
+                                          <Droppable droppableId={`items-${sectionIdx}`} type="ITEM">
+                                            {(provided, snapshot) => (
+                                              <div
+                                                {...provided.droppableProps}
+                                                ref={provided.innerRef}
+                                                className={expandedSections[sectionIdx] ? `space-y-2 min-h-[40px] ${snapshot.isDraggingOver ? 'bg-green-50 border-2 border-green-200 border-dashed rounded' : ''}` : ''}
+                                                style={!expandedSections[sectionIdx] ? { display: 'none' } : undefined}
+                                              >
+                                                {/* Render items - use actual index to keep drag positions correct */}
+                                                {Array.isArray(section.items) && section.items.map((item, itemIdx) => {
+                                                  if (!item) return null;
+                                                  return (
                                                     <Draggable
-                                                      key={`item-${sectionIdx}-${itemIdx}`}
+                                                      key={`item-${sectionIdx}-${item.id || item.seqNo || itemIdx}-${itemIdx}`}
                                                       draggableId={`item-${sectionIdx}-${itemIdx}`}
                                                       index={itemIdx}
                                                     >
@@ -4933,11 +4934,13 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                         </div>
                                                       )}
                                                     </Draggable>
-                                                  ))}
-                                                </div>)}
-                                            </Droppable>
-                                            {/* Add item (lecture/quiz) */}
-                                            {addType && addType.sectionIdx === sectionIdx ? (
+                                                  );
+                                                  })}
+                                                {provided.placeholder}
+                                              </div>)}
+                                          </Droppable>
+                                            {/* Add item (lecture/quiz) - only show when expanded */}
+                                            {expandedSections[sectionIdx] && (addType && addType.sectionIdx === sectionIdx ? (
                                               <div className="flex flex-col md:flex-row gap-2 mt-2">
                                                 <Button
                                                   type="button"
@@ -5032,11 +5035,10 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                   }}
                                                 />
                                               </div>
-                                            )}
+                                            ))}
                                           </div>
                                         )}
                                       </FieldArray>
-                                    )}
                                   </div>
                                 </div>)}
                             </Draggable>

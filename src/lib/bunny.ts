@@ -1,5 +1,9 @@
 // Bunny.net Stream Configuration
 // Documentation: https://docs.bunny.net/docs/stream-api-overview
+// TUS Resumable Uploads: https://docs.bunny.net/stream/tus-resumable-uploads
+
+import * as tus from 'tus-js-client';
+import SHA256 from 'crypto-js/sha256';
 
 // Default configuration (can be overridden by environment variables)
 const BUNNY_LIBRARY_ID = '645326';
@@ -10,6 +14,12 @@ const BUNNY_CDN_HOSTNAME = 'vz-59047644-a93.b-cdn.net';
 const BUNNY_STORAGE_ZONE = 'zktutorials';
 const BUNNY_STORAGE_PASSWORD = 'd422a41a-a421-4411-992461794f24-b7eb-4ba5';
 const BUNNY_STORAGE_HOSTNAME = 'storage.bunnycdn.com';
+
+// TUS upload endpoint for Bunny Stream
+const BUNNY_TUS_ENDPOINT = 'https://video.bunnycdn.com/tusupload';
+
+// Track active TUS uploads for abort/cancel support
+const activeTusUploads = new Map<string, tus.Upload>();
 
 export const BUNNY_CONFIG = {
   LIBRARY_ID: process.env.REACT_APP_BUNNY_LIBRARY_ID || BUNNY_LIBRARY_ID,
@@ -92,8 +102,29 @@ interface UploadResult {
 }
 
 /**
- * Upload video to Bunny Stream
- * This is for video files - uses the Stream API for transcoding and delivery
+ * Generate SHA256 signature for Bunny TUS authentication
+ * Signature = SHA256(libraryId + apiKey + expirationTime + videoId)
+ */
+const generateTusSignature = (
+  libraryId: string,
+  apiKey: string,
+  expirationTime: number,
+  videoId: string
+): string => {
+  const signatureString = `${libraryId}${apiKey}${expirationTime}${videoId}`;
+  return SHA256(signatureString).toString();
+};
+
+/**
+ * Upload video to Bunny Stream using TUS Resumable Upload Protocol
+ * 
+ * Benefits over the previous XHR approach:
+ * - Resumable: uploads can resume from where they left off after network interruptions
+ * - Retry: automatic retry with exponential backoff on transient failures
+ * - Chunked: large files are uploaded in 5MB chunks, reducing memory pressure
+ * - Reliable: TUS protocol ensures upload integrity with server-side validation
+ * 
+ * @see https://docs.bunny.net/stream/tus-resumable-uploads
  */
 export const uploadVideoToBunnyStream = async (
   file: File,
@@ -104,13 +135,15 @@ export const uploadVideoToBunnyStream = async (
   }
 
   try {
-    console.log('Uploading video to Bunny Stream:', {
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    console.log(`[TUS] Starting resumable upload to Bunny Stream:`, {
       libraryId: BUNNY_CONFIG.LIBRARY_ID,
       fileName: file.name,
-      fileSize: file.size,
+      fileSize: `${fileSizeMB} MB`,
+      fileType: file.type,
     });
 
-    // Step 1: Create video entry in Bunny Stream
+    // Step 1: Create video entry in Bunny Stream (unchanged from before)
     const videoTitle = file.name.replace(/\.[^/.]+$/, ''); // Remove extension for title
 
     const createResponse = await fetch(
@@ -130,40 +163,138 @@ export const uploadVideoToBunnyStream = async (
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      console.error('Failed to create video entry:', createResponse.status, errorText);
+      console.error('[TUS] Failed to create video entry:', createResponse.status, errorText);
       throw new Error(`Failed to create video: ${createResponse.status} - ${errorText}`);
     }
 
     const videoData: BunnyVideoResponse = await createResponse.json();
-    console.log('Video entry created:', videoData);
+    console.log('[TUS] Video entry created:', videoData);
 
-    // Step 2: Upload the actual video file
-    const uploadUrl = `https://video.bunnycdn.com/library/${BUNNY_CONFIG.LIBRARY_ID}/videos/${videoData.guid}`;
+    // Step 2: Generate TUS authentication signature
+    // Signature expires in 24 hours — plenty of time for large uploads
+    const expirationTime = Math.floor(Date.now() / 1000) + 86400; // 24 hours from now
+    const signature = generateTusSignature(
+      BUNNY_CONFIG.LIBRARY_ID,
+      BUNNY_CONFIG.API_KEY,
+      expirationTime,
+      videoData.guid
+    );
 
-    // Use XMLHttpRequest for progress tracking
-    const uploadResult = await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('AccessKey', BUNNY_CONFIG.API_KEY);
-      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    console.log('[TUS] Authentication signature generated, expiry:', new Date(expirationTime * 1000).toISOString());
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          try { onProgress(percent); } catch (e) { /* ignore callback errors */ }
-        }
-      };
+    // Step 3: Upload using TUS resumable protocol
+    await new Promise<void>((resolve, reject) => {
+      const upload = new tus.Upload(file, {
+        endpoint: BUNNY_TUS_ENDPOINT,
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
+        // Retry with exponential backoff: immediate, 3s, 5s, 10s, 20s, 60s, 60s
+        retryDelays: [0, 3000, 5000, 10000, 20000, 60000, 60000],
+
+        // 5 MB chunk size — good balance for large files on variable connections
+        chunkSize: 5 * 1024 * 1024,
+
+        // Bunny.net TUS authentication headers
+        headers: {
+          'AuthorizationSignature': signature,
+          'AuthorizationExpire': expirationTime.toString(),
+          'VideoId': videoData.guid,
+          'LibraryId': BUNNY_CONFIG.LIBRARY_ID,
+        },
+
+        // Video metadata for Bunny Stream
+        metadata: {
+          filetype: file.type || 'video/mp4',
+          title: videoTitle,
+        },
+
+        // Progress tracking
+        onProgress: function (bytesUploaded: number, bytesTotal: number) {
+          const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
+          console.log(`[TUS] Upload progress: ${percentage}% (${(bytesUploaded / (1024 * 1024)).toFixed(1)}/${(bytesTotal / (1024 * 1024)).toFixed(1)} MB)`);
+          if (onProgress) {
+            try { onProgress(percentage); } catch (e) { /* ignore callback errors */ }
+          }
+        },
+
+        // Upload completed successfully
+        onSuccess: function () {
+          console.log(`[TUS] Upload completed successfully for: ${file.name}`);
+          activeTusUploads.delete(videoData.guid);
           resolve();
-        } else {
-          reject(new Error(`Upload failed: ${xhr.status} - ${xhr.statusText}`));
-        }
-      };
+        },
 
-      xhr.onerror = () => reject(new Error('Network error during Bunny upload'));
-      xhr.send(file);
+        // Upload failed after all retries exhausted
+        onError: function (error: Error) {
+          console.error(`[TUS] Upload failed for ${file.name}:`, error.message);
+          activeTusUploads.delete(videoData.guid);
+          reject(new Error(`TUS upload failed: ${error.message}`));
+        },
+
+        // Decide whether to retry on error — retry on network errors and 5xx server errors
+        onShouldRetry: function (err: any, retryAttempt: number, _options: any) {
+          const status = err?.originalResponse?.getStatus?.();
+          console.warn(`[TUS] Retry attempt ${retryAttempt + 1} for ${file.name}`, {
+            status,
+            message: err?.message,
+          });
+
+          // Retry on server errors (5xx)
+          if (status && status >= 500 && status < 600) {
+            return true;
+          }
+
+          // Retry on network errors (no status = connection lost)
+          if (!status) {
+            return true;
+          }
+
+          // Don't retry on client errors (4xx) except 408 (Request Timeout) and 429 (Too Many Requests)
+          if (status === 408 || status === 429) {
+            return true;
+          }
+
+          // Don't retry on other 4xx errors
+          if (status >= 400 && status < 500) {
+            return false;
+          }
+
+          // Default: retry
+          return true;
+        },
+
+        // Called before each request — useful for logging
+        onBeforeRequest: function (req: any) {
+          // Ensure headers are set on every request (including retries)
+          const xhr = req.getUnderlyingObject?.();
+          if (xhr) {
+            console.log(`[TUS] Sending request to: ${req.getURL?.() || 'unknown'}`);
+          }
+        },
+
+        // Called after upload URL is created — log for debugging
+        onAfterResponse: function (_req: any, res: any) {
+          const status = res.getStatus?.();
+          if (status && status >= 400) {
+            console.warn(`[TUS] Server responded with status ${status}`);
+          }
+        },
+      });
+
+      // Track the upload for abort/cancel support
+      activeTusUploads.set(videoData.guid, upload);
+
+      // Check for previous uploads to resume (key feature for unreliable networks)
+      upload.findPreviousUploads().then(function (previousUploads) {
+        if (previousUploads.length > 0) {
+          console.log(`[TUS] Found ${previousUploads.length} previous upload(s), resuming from last checkpoint...`);
+          upload.resumeFromPreviousUpload(previousUploads[0]);
+        }
+        // Start the upload (or resume)
+        upload.start();
+      }).catch(function (err) {
+        console.warn('[TUS] Could not check for previous uploads, starting fresh:', err);
+        upload.start();
+      });
     });
 
     // Get video duration from file
@@ -181,7 +312,7 @@ export const uploadVideoToBunnyStream = async (
     const playbackUrl = `https://${BUNNY_CONFIG.CDN_HOSTNAME}/${videoData.guid}/playlist.m3u8`;
     const thumbnailUrl = `https://${BUNNY_CONFIG.CDN_HOSTNAME}/${videoData.guid}/thumbnail.jpg`;
 
-    console.log('Video uploaded successfully:', {
+    console.log('[TUS] Video uploaded successfully:', {
       videoId: videoData.guid,
       playbackUrl,
       thumbnailUrl,
@@ -196,9 +327,31 @@ export const uploadVideoToBunnyStream = async (
       thumbnailUrl,
     };
   } catch (error) {
-    console.error('Bunny Stream upload error:', error);
+    console.error('[TUS] Bunny Stream upload error:', error);
     throw error;
   }
+};
+
+/**
+ * Abort an active TUS video upload by videoId
+ * Useful for cancellation when user navigates away or explicitly cancels
+ */
+export const abortVideoUpload = (videoId: string): boolean => {
+  const upload = activeTusUploads.get(videoId);
+  if (upload) {
+    upload.abort();
+    activeTusUploads.delete(videoId);
+    console.log(`[TUS] Upload aborted for video: ${videoId}`);
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Get the number of currently active TUS uploads
+ */
+export const getActiveUploadCount = (): number => {
+  return activeTusUploads.size;
 };
 
 /**
