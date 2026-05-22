@@ -94,7 +94,7 @@ const EducationLandingPage: React.FC = () => {
       <Courses/>
       
       {/* Trusted Customers */}
-      <TrustAndEducationSections/>
+      {/* <TrustAndEducationSections/> */}
       
       {/* Certification Section */}
       <BestEducationSections/>

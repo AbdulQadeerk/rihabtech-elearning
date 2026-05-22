@@ -332,7 +332,7 @@ export default function Pricing() {
         />
       )}
 
-      <TrustAndEducationSections />
+      {/* <TrustAndEducationSections /> */}
       <PracticeAdvice />
       <NewCourses />
     </div>
