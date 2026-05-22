@@ -1405,10 +1405,10 @@ export function CourseCarriculam({ onSubmit }: any) {
           // Initialize the last saved ref with current curriculum
           lastSavedCurriculumRef.current = JSON.stringify(normalizedCurriculum);
 
-          // Auto-expand all sections
+          // Keep saved sections collapsed by default when loading the curriculum
           const newExpanded: Record<number, boolean> = {};
           normalizedCurriculum.sections.forEach((_: any, idx: number) => {
-            newExpanded[idx] = true;
+            newExpanded[idx] = false;
           });
           setExpandedSections(newExpanded);
         } else {
@@ -1430,10 +1430,10 @@ export function CourseCarriculam({ onSubmit }: any) {
             setCurriculumKey(prev => prev + 1); // Force formik reinitialization
             lastSavedCurriculumRef.current = JSON.stringify(normalizedCurriculum);
             
-            // Auto-expand all sections
+            // Keep saved sections collapsed by default when loading the curriculum
             const newExpanded: Record<number, boolean> = {};
             normalizedCurriculum.sections.forEach((_: any, idx: number) => {
-              newExpanded[idx] = true;
+              newExpanded[idx] = false;
             });
             setExpandedSections(newExpanded);
           } else {
