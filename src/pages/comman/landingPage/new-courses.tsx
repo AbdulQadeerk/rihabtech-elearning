@@ -6,15 +6,17 @@ import { eventApiService, Event } from "../../../utils/eventApiService";
 
 export default function NewCourses() {
   const [events, setEvents] = useState<Event[]>([]);
+  const [sectionTitle, setSectionTitle] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         setLoading(true);
-        const data = await eventApiService.getAllEvents();
+        const data = await eventApiService.getEventSection();
+        setSectionTitle(data.title);
         // Limit to 3 events as per the design
-        setEvents(data.slice(0, 3));
+        setEvents(data.events.slice(0, 3));
       } catch (error) {
         console.error("Error fetching events:", error);
       } finally {
@@ -52,7 +54,7 @@ export default function NewCourses() {
     <section className="py-16">
       <div className="container mx-auto px-8">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="section-title">What’s New on Rihab Technologies</h2>
+          {sectionTitle && <h2 className="section-title">{sectionTitle}</h2>}
           <Button variant={'outline'} className="px-6 py-3 rounded-none border-black h-auto text-black hover:bg-primary font-medium" onClick={() => {
             window.location.href = '/#/courselist';
           }}>
@@ -89,4 +91,4 @@ export default function NewCourses() {
       </div>
     </section>
   )
-}
+}
