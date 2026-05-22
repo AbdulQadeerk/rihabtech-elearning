@@ -3172,13 +3172,13 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                                 const files = Array.from(e.target.files || []);
                                                                                 if (files.length === 0) return;
 
-                                                                                const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
+                                                                                const MAX_SIZE = 150 * 1024 * 1024; // 150 MB
 
                                                                                 for (let file of files) {
                                                                                   if (file.size > MAX_SIZE) {
                                                                                     formik.setFieldError(
                                                                                       `sections[${sectionIdx}].items[${itemIdx}].contentFiles`,
-                                                                                      `${file.name} is should below than 100 MB`
+                                                                                      `${file.name} is should below than 150 MB`
                                                                                     );
                                                                                     // Reset input after error
                                                                                     setTimeout(() => {
