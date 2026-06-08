@@ -1112,6 +1112,21 @@ export function CourseCarriculam({ onSubmit }: any) {
   const [bulkUploadVideos, setBulkUploadVideos] = useState<BulkVideoItem[]>([]);
   const [targetSectionIdx, setTargetSectionIdx] = useState<number | null>(null);
 
+  const collapseLoadedSections = (sections?: Section[]) => {
+    const newExpanded: Record<number, boolean> = {};
+    sections?.forEach((_: any, idx: number) => {
+      newExpanded[idx] = false;
+    });
+    setExpandedSections(newExpanded);
+  };
+
+  const expandSection = (sectionIdx: number) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionIdx]: true
+    }));
+  };
+
   // Handle bulk video upload for a section - Now opens a confirmation dialog first
   const handleBulkVideoUpload = (files: FileList, sectionIdx: number) => {
     if (!files || files.length === 0) return;
@@ -1405,12 +1420,7 @@ export function CourseCarriculam({ onSubmit }: any) {
           // Initialize the last saved ref with current curriculum
           lastSavedCurriculumRef.current = JSON.stringify(normalizedCurriculum);
 
-          // Keep saved sections collapsed by default when loading the curriculum
-          const newExpanded: Record<number, boolean> = {};
-          normalizedCurriculum.sections.forEach((_: any, idx: number) => {
-            newExpanded[idx] = false;
-          });
-          setExpandedSections(newExpanded);
+          collapseLoadedSections(normalizedCurriculum.sections);
         } else {
           // Fallback to localStorage if no API data
           const savedCurriculum = localStorage.getItem(`curriculum_${courseData.id}`);
@@ -1430,15 +1440,11 @@ export function CourseCarriculam({ onSubmit }: any) {
             setCurriculumKey(prev => prev + 1); // Force formik reinitialization
             lastSavedCurriculumRef.current = JSON.stringify(normalizedCurriculum);
             
-            // Keep saved sections collapsed by default when loading the curriculum
-            const newExpanded: Record<number, boolean> = {};
-            normalizedCurriculum.sections.forEach((_: any, idx: number) => {
-              newExpanded[idx] = false;
-            });
-            setExpandedSections(newExpanded);
+            collapseLoadedSections(normalizedCurriculum.sections);
           } else {
             console.log("No curriculum data from API or localStorage, checking Firebase fallback");
             // Fallback to Firebase if no API data
+            let loadedFirebaseCurriculum = false;
             if (draftId.current) {
               const draft = await getCourseDraft(draftId.current);
               if (draft && draft.curriculum) {
@@ -1452,7 +1458,13 @@ export function CourseCarriculam({ onSubmit }: any) {
                 console.log("Normalized curriculum from Firebase:", normalizedCurriculum);
                 setFormInitialValues(normalizedCurriculum);
                 setCurriculumKey(prev => prev + 1); // Force formik reinitialization
+                collapseLoadedSections(normalizedCurriculum.sections);
+                loadedFirebaseCurriculum = true;
               }
+            }
+
+            if (!loadedFirebaseCurriculum) {
+              expandSection(0);
             }
           }
         }
@@ -1467,7 +1479,7 @@ export function CourseCarriculam({ onSubmit }: any) {
     if (!isLoading) {
       fetchDraft();
     }
-  }, [user, courseData, isLoading]);
+  }, [user, courseData?.id, isLoading]);
 
   // Watch for changes in courseData.curriculum and update form
   useEffect(() => {
@@ -1478,6 +1490,11 @@ export function CourseCarriculam({ onSubmit }: any) {
       const sortedCurriculum = sortCurriculumBySeqNo(courseData.curriculum);
       // Normalize seqNo to match array indices
       const normalizedCurriculum = normalizeSeqNo(sortedCurriculum);
+      const currentCurriculum = stripFilesFromCurriculum(formik.values);
+
+      if (JSON.stringify(normalizedCurriculum) === JSON.stringify(currentCurriculum)) {
+        return;
+      }
 
       setFormInitialValues(normalizedCurriculum as unknown as CurriculumFormValues);
       setCurriculumKey(prev => prev + 1); // Force formik reinitialization
@@ -3900,7 +3917,10 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                     {!editLecture && <Button
                                                                       className="h-[10] rounded-none text-sm"
                                                                       type="button"
-                                                                      onClick={() => setShowContentType({ sectionIdx, itemIdx })}
+                                                                      onClick={() => {
+                                                                        expandSection(sectionIdx);
+                                                                        setShowContentType({ sectionIdx, itemIdx });
+                                                                      }}
                                                                     >
                                                                       {(
                                                                         item.contentType && (
