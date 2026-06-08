@@ -17,7 +17,7 @@ export default function SignUpPage() {
   const [phoneCountry, setPhoneCountry] = useState('IN'); // Default to India
   const signupSchema = useFormik({
     initialValues: {
-      name:'',
+      name: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -42,7 +42,7 @@ export default function SignUpPage() {
         .oneOf([Yup.ref('password'), ''], 'Passwords must match')
         .required('Confirm Password is Required'),
       number: Yup.string()
-        .test('is-valid-phone', 'Invalid phone number for selected country.', function(value) {
+        .test('is-valid-phone', 'Invalid phone number for selected country.', function (value) {
           const { parent } = this;
           if (!value) return false;
           try {
@@ -74,18 +74,18 @@ export default function SignUpPage() {
             password: values.password,
           }),
         });
-        
+
         // Get response text first to handle both JSON and plain text
         const responseText = await response.text();
         let data: any;
-        
+
         // Try to parse as JSON, if it fails, use the text directly
         try {
           data = JSON.parse(responseText);
         } catch {
           data = responseText;
         }
-        
+
         if (response.ok && data) {
           // If data is a string, try to parse it (API may return object or stringified object)
           let userObj = typeof data === 'string' ? JSON.parse(data) : data;
@@ -96,22 +96,22 @@ export default function SignUpPage() {
         } else {
           // Extract error message from various possible fields and formats
           let errorMsg = 'Registration failed. Please try again.';
-          
+
           if (typeof data === 'string' && data.trim()) {
             // If response is a plain string, use it directly
             errorMsg = data;
           } else if (typeof data === 'object' && data !== null) {
             // Try different possible error message fields
-            errorMsg = data.message || 
-                      data.error || 
-                      data.msg || 
-                      data.errorMessage ||
-                      data.error_description ||
-                      (data.errors && Array.isArray(data.errors) && data.errors[0]) ||
-                      (data.errors && typeof data.errors === 'string' && data.errors) ||
-                      errorMsg;
+            errorMsg = data.message ||
+              data.error ||
+              data.msg ||
+              data.errorMessage ||
+              data.error_description ||
+              (data.errors && Array.isArray(data.errors) && data.errors[0]) ||
+              (data.errors && typeof data.errors === 'string' && data.errors) ||
+              errorMsg;
           }
-          
+
           console.error('Registration error response:', { status: response.status, data, errorMsg });
           toast.error(errorMsg);
         }
@@ -180,23 +180,23 @@ export default function SignUpPage() {
                 Full Name<span className="text-[#ff0000]"> *</span>
               </label>
               <Input id="username" value={signupSchema.values.name} name="name"
-          onChange={signupSchema.handleChange} placeholder="John Doe" />
-          {signupSchema.touched.name && signupSchema.errors.name && (
-          <p className="text-red-500 text-sm mt-1">{signupSchema.errors.name}</p>
-        )}
+                onChange={signupSchema.handleChange} placeholder="John Doe" />
+              {signupSchema.touched.name && signupSchema.errors.name && (
+                <p className="text-red-500 text-sm mt-1">{signupSchema.errors.name}</p>
+              )}
             </div>
 
             <div>
               <label htmlFor="email" className="text-sm text-gray-600 block mb-1">
                 Email<span className="text-[#ff0000]"> *</span>
               </label>
-              <Input id="email" type="email" 
-              value={signupSchema.values.email}
-          onChange={signupSchema.handleChange}
-          onBlur={signupSchema.handleBlur} placeholder="johndoe@email.com" />
-          {signupSchema.touched.email && signupSchema.errors.email && (
-          <p className="text-red-500 text-sm mt-1">{signupSchema.errors.email}</p>
-        )}
+              <Input id="email" type="email"
+                value={signupSchema.values.email}
+                onChange={signupSchema.handleChange}
+                onBlur={signupSchema.handleBlur} placeholder="johndoe@email.com" />
+              {signupSchema.touched.email && signupSchema.errors.email && (
+                <p className="text-red-500 text-sm mt-1">{signupSchema.errors.email}</p>
+              )}
             </div>
 
             <div>
@@ -206,6 +206,7 @@ export default function SignUpPage() {
               <div className="relative">
                 <PhoneInput
                   country={'in'}
+                  countryCodeEditable={false}
                   value={signupSchema.values.number}
                   onChange={(value, country) => {
                     signupSchema.setFieldValue('number', value);
@@ -239,9 +240,9 @@ export default function SignUpPage() {
               </label>
               <div className="relative">
                 <Input id="address"
-                value={signupSchema.values.address}
-          onChange={signupSchema.handleChange}
-                 placeholder="Mumbai, India" />
+                  value={signupSchema.values.address}
+                  onChange={signupSchema.handleChange}
+                  placeholder="Mumbai, India" />
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
@@ -250,8 +251,8 @@ export default function SignUpPage() {
                 </div>
               </div>
               {signupSchema.touched.address && signupSchema.errors.address && (
-          <p className="text-red-500 text-sm mt-1">{signupSchema.errors.address}</p>
-        )}
+                <p className="text-red-500 text-sm mt-1">{signupSchema.errors.address}</p>
+              )}
             </div>
 
             <div>
@@ -259,16 +260,16 @@ export default function SignUpPage() {
                 Password<span className="text-[#ff0000]"> *</span>
               </label>
               <div className="relative">
-                <Input 
+                <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                   value={signupSchema.values.password}
-          onChange={signupSchema.handleChange}
+                  value={signupSchema.values.password}
+                  onChange={signupSchema.handleChange}
                   placeholder="••••••••••••"
                 />
                 {signupSchema.touched.password && signupSchema.errors.password && (
-          <p className="text-red-500 text-sm mt-1">{signupSchema.errors.password}</p>
-        )}
+                  <p className="text-red-500 text-sm mt-1">{signupSchema.errors.password}</p>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -308,29 +309,30 @@ export default function SignUpPage() {
               </div>
             </div>
             <div className="flex items-center justify-between space-x-2 mt-4">
-            <div className="flex items-center space-x-2 mt-4">
-          <Checkbox
-            id="terms"
-            checked={signupSchema.values.termsconditions}
-            onCheckedChange={(checked) =>
-              signupSchema.setFieldValue("termsconditions", checked)
-            }
-            className="data-[state=checked]:bg-orange-500 border-gray-300"
-          />
-              <label htmlFor="terms" className="text-xs text-gray-600">
-                I accept the <a className="font-bold cursor-pointer" onClick={()=>{
-                  signupSchema.setFieldValue("termsconditions", true)
-                  window.location.hash="#/terms-of-use"}}>terms & conditions</a>
-                  <br/>
-                  { signupSchema.errors.termsconditions && (
-          <p className="text-red-500 text-sm mt-1">{signupSchema.errors.termsconditions}</p>
-        )}
-              </label>
-            </div>
+              <div className="flex items-center space-x-2 mt-4">
+                <Checkbox
+                  id="terms"
+                  checked={signupSchema.values.termsconditions}
+                  onCheckedChange={(checked) =>
+                    signupSchema.setFieldValue("termsconditions", checked)
+                  }
+                  className="data-[state=checked]:bg-orange-500 border-gray-300"
+                />
+                <label htmlFor="terms" className="text-xs text-gray-600">
+                  I accept the <a className="font-bold cursor-pointer" onClick={() => {
+                    signupSchema.setFieldValue("termsconditions", true)
+                    window.location.hash = "#/terms-of-use"
+                  }}>terms & conditions</a>
+                  <br />
+                  {signupSchema.errors.termsconditions && (
+                    <p className="text-red-500 text-sm mt-1">{signupSchema.errors.termsconditions}</p>
+                  )}
+                </label>
+              </div>
 
-            <Button type="submit" className="px-8 btn-rouded bg-orange-500 hover:bg-orange-600 mt-4" disabled={loading}>
-              {loading ? 'Signing up...' : 'SIGN UP'}
-            </Button>
+              <Button type="submit" className="px-8 btn-rouded bg-orange-500 hover:bg-orange-600 mt-4" disabled={loading}>
+                {loading ? 'Signing up...' : 'SIGN UP'}
+              </Button>
             </div>
 
             <LoginModeDialog open={isLoginModeOpen} setOpen={setLoginModeIsOpen} setIsInstructor={setLoginMode} />

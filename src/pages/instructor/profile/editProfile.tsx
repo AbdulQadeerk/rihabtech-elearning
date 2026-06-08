@@ -34,7 +34,7 @@ const InstructorEditProfile: React.FC<InstructorEditProfileProps> = ({ user, pro
         gender: profile.gender || '',
         address: profile.address || '',
       });
-      
+
       // Log values after setting
       setTimeout(() => {
         console.log('Form values after setting:', formik.values);
@@ -145,7 +145,7 @@ const InstructorEditProfile: React.FC<InstructorEditProfileProps> = ({ user, pro
         if (response.ok) {
           toast.success('Profile updated successfully');
           setSuccess('Profile updated successfully!');
-          
+
           // Update formik values directly first to prevent form clearing
           formik.setValues({
             name: values.name,
@@ -154,7 +154,7 @@ const InstructorEditProfile: React.FC<InstructorEditProfileProps> = ({ user, pro
             gender: values.gender,
             address: values.address
           });
-          
+
           // Update local profile state with new data (preserve all existing fields)
           const updatedProfile = {
             ...profile,
@@ -165,7 +165,7 @@ const InstructorEditProfile: React.FC<InstructorEditProfileProps> = ({ user, pro
             address: values.address
           };
           setProfile(updatedProfile);
-          
+
           // Update localStorage with new data
           const updatedUser = { ...user, Name: values.name, PhoneNumber: values.phone, Gender: values.gender, Address: values.address };
           localStorage.setItem('token', JSON.stringify(updatedUser));
@@ -252,7 +252,7 @@ const InstructorEditProfile: React.FC<InstructorEditProfileProps> = ({ user, pro
               <div className="text-red-500 text-xs mt-1">{formik.errors.name}</div>
             )}
           </div>
-         
+
           <div>
             <label className="block text-base font-medium text-[#888] mb-1 font-barlow">Email</label>
             <Input
@@ -272,6 +272,7 @@ const InstructorEditProfile: React.FC<InstructorEditProfileProps> = ({ user, pro
             <label className="block text-base font-medium text-[#888] mb-1 font-barlow">Phone No.</label>
             <PhoneInput
               country={'in'}
+              countryCodeEditable={false}
               value={formik.values.phone}
               onChange={(value, country) => {
                 formik.setFieldValue('phone', value);

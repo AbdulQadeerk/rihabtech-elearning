@@ -83,7 +83,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
       setCouponId("");
     }
   }, [isOpen]);
-  
+
   // Recalculate pricing when discount changes
   useEffect(() => {
     // This will trigger a re-render with updated pricing
@@ -104,7 +104,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
     try {
       const orderAmount = plan.totalAmount ?? plan.basePrice ?? 0;
       const coupons = await couponService.getAvailableCoupons(
-        user?.email || user?.uid || "", 
+        user?.email || user?.uid || "",
         [selectedCategory],
         orderAmount
       );
@@ -133,7 +133,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
       // Calculate base amount (before tax) for coupon validation
       const totalAmount = plan.totalAmount ?? plan.basePrice ?? 0;
       const basePrice = plan.basePrice || (totalAmount > 0 ? totalAmount / (1 + plan.taxPercentage / 100) : 0);
-      
+
       // Use custom API for coupon validation
       const request: PreviewCouponRequest = {
         couponCode: code,
@@ -156,7 +156,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
       }
 
       const discountAmt = response.discountAmount ?? 0;
-      
+
       setCouponDiscount(discountAmt);
       setAppliedCouponCode(code);
       setCouponId(response.couponId?.toString() || "");
@@ -243,7 +243,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
 
     try {
       const pricing = calculatePricingBreakdown();
-      
+
       const paymentData: SubscriptionPaymentData = {
         userId: user?.email || '',
         userEmail: userInfo.email,
@@ -268,7 +268,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
       if (pricing.totalAmount === 0) {
         // Handle free subscription directly without Razorpay
         const subscriptionId = await razorpayService.handleFreeSubscription(paymentData);
-        
+
         toast.success('Subscription activated successfully!');
         onSuccess();
         onClose();
@@ -373,7 +373,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
       };
 
       const razorpay = new Razorpay(options);
-      
+
       razorpay.on('payment.failed', (response: any) => {
         console.error('Payment failed:', response);
         toast.error('Payment failed. Please try again.');
@@ -381,7 +381,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
       });
 
       razorpay.open();
-      
+
     } catch (error) {
       console.error('Payment initiation error:', error);
       toast.error('Failed to initiate payment. Please try again.');
@@ -507,6 +507,7 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
                 </label>
                 <PhoneInput
                   country={'in'}
+                  countryCodeEditable={false}
                   value={userInfo.phone}
                   onChange={(value, country) => {
                     handleInputChange('phone', value);
@@ -540,11 +541,10 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
               {paymentMethods.map((method) => (
                 <div
                   key={method.id}
-                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                    selectedPaymentMethod === method.id
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${selectedPaymentMethod === method.id
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  } ${!method.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${!method.available ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={() => method.available && setSelectedPaymentMethod(method.id)}
                 >
                   <div className="flex items-center space-x-3">
