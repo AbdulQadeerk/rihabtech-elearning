@@ -12,7 +12,7 @@ import {
   getCourseStructure
 } from '../../../../utils/firebaseCoursePreviewHelpers';
 import { courseApiService, Category, SubCategory, CourseSubmitForReviewResponse } from '../../../../utils/courseApiService';
-import { BookOpen, Users, Info, DollarSign, MessageSquare, Eye, Loader2 } from 'lucide-react';
+import { BookOpen, Users, Info, DollarSign, MessageSquare, Eye, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { SubmitRequirementsDialog } from '../../../../components/ui/submitrequiremntdialog';
 import { COURSE_STATUS } from '../../../../utils/firebaseCourses';
 import { CourseWorkflowService } from '../../../../utils/courseWorkflowService';
@@ -44,6 +44,7 @@ const PreviewCourse = () => {
   const [missingRequirements, setMissingRequirements] = useState<Record<string, string[]>>({});
   const [categoryName, setCategoryName] = useState<string>('');
   const [subcategoryName, setSubcategoryName] = useState<string>('');
+  const [expandedSections, setExpandedSections] = useState<Record<number, boolean>>({});
   const draftId = useRef<string>(localStorage.getItem('draftId') || '');
   const { user } = useAuth();
   const { courseData, isLoading: courseDataLoading } = useCourseData();
@@ -112,6 +113,10 @@ const PreviewCourse = () => {
 
   const goToDashboard = () => {
     window.location.hash = '#/instructor/course-test-selection';
+  };
+
+  const toggleSection = (sectionIdx: number) => {
+    setExpandedSections(prev => ({ ...prev, [sectionIdx]: !prev[sectionIdx] }));
   };
 
   // Submit for Review handler
@@ -369,22 +374,30 @@ const PreviewCourse = () => {
       <div className="mb-8">
         <h3 className="text-xl font-bold flex items-center gap-2 mb-2"><Info className="inline-block text-purple-500" /> Curriculum</h3>
         {course.curriculum && course.curriculum.sections && course.curriculum.sections.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {course.curriculum.sections.map((section: any, sectionIdx: number) => (
-              <div key={sectionIdx} className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-bold text-lg text-primary">Section {sectionIdx + 1}:</span>
-                  <span className="font-semibold text-gray-700">{section.name}</span>
-                  {(section.published !== false) ? (
-                    <span className="ml-2 px-2 py-1 bg-green-200 text-green-800 rounded text-xs">Published</span>
-                  ) : (
-                    <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs">Unpublished</span>
-                  )}
+              <div key={sectionIdx} className="border rounded-lg bg-gray-50 overflow-hidden">
+                <div 
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => toggleSection(sectionIdx)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-lg text-primary">Section {sectionIdx + 1}:</span>
+                    <span className="font-semibold text-gray-700">{section.name}</span>
+                    {(section.published !== false) ? (
+                      <span className="ml-2 px-2 py-1 bg-green-200 text-green-800 rounded text-xs">Published</span>
+                    ) : (
+                      <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs">Unpublished</span>
+                    )}
+                  </div>
+                  {expandedSections[sectionIdx] ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
                 </div>
-                {section.description && <div className="mb-2 text-gray-600">{section.description}</div>}
-                <div className="ml-4">
-                  {section.items && section.items.length > 0 ? (
-                    <ul className="list-disc ml-4">
+                {expandedSections[sectionIdx] && (
+                  <div className="p-4 border-t border-gray-200 bg-white">
+                    {section.description && <div className="mb-4 text-gray-600">{section.description}</div>}
+                    <div className="ml-2">
+                      {section.items && section.items.length > 0 ? (
+                        <ul className="list-disc ml-4">
                       {section.items.map((item: any, itemIdx: number) => (
                         <li key={itemIdx} className="mb-2">
                           <div className="flex items-center gap-2 mb-1">
@@ -526,7 +539,9 @@ const PreviewCourse = () => {
                       ))}
                     </ul>
                   ) : <div className="text-gray-400 ml-4">No items in this section.</div>}
-                </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
