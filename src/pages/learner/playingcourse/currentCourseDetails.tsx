@@ -10,7 +10,7 @@ import Announcements from './announcements';
 import ReactPlayer from 'react-player';
 import QNA from './qna';
 import { CourseDetails, extractQuizData } from '../../../utils/courseDetailsInterface';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { progressApiService, StudentProgress, LectureProgress } from '../../../utils/progressApiService';
 import { courseApiService, CourseResponse, CourseDetailsResponse } from '../../../utils/courseApiService';
@@ -56,16 +56,19 @@ export default function CourseDetailsPage() {
 
 
 
+  const location = useLocation();
+
   const getCourseIdFromURL = (): string | null => {
-    // First try useParams
-    if (courseId) return courseId;
+    // Try to get from React Router location search
+    const params = new URLSearchParams(location.search);
+    if (params.get('courseId')) return params.get('courseId');
 
     // Try to get from URL hash (e.g., #/courseDetails?courseId=123)
     const hash = window.location.hash;
     if (hash.includes('?')) {
       const queryString = hash.split('?')[1];
       const urlParams = new URLSearchParams(queryString);
-      return urlParams.get('courseId');
+      if (urlParams.get('courseId')) return urlParams.get('courseId');
     }
 
     // Try to get from URL search params
@@ -73,17 +76,23 @@ export default function CourseDetailsPage() {
     return urlParams.get('courseId');
   };
 
-
   useEffect(() => {
     const id = getCourseIdFromURL();
-    if (id) {
-      // If courseId is found in URL, set it in state
+    if (id && id !== courseId) {
+      // If courseId is found in URL and is different from current, set it in state
+      // and clear the old course data so the new course can load cleanly
       setCourseId(id);
-    } else {
+      setCourseData(null);
+      setApiCourseData(null);
+      setEnrichedCourseData(null);
+      setActiveModule(null);
+      setProgress(null);
+      setLoading(true);
+    } else if (!id && !courseId) {
       setError("Course ID not found in URL");
       setLoading(false);
     }
-  }, []);
+  }, [location, courseId]);
 
 
 
