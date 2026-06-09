@@ -13,7 +13,7 @@ const EducationLandingPage: React.FC = () => {
       <BannerSection></BannerSection>
 
       {/* Top-Rated Courses Section */}
-      <section className="py-16">
+      {/* <section className="py-16">
         <div className="container mx-auto px-4">
           <h2 className="text-[#000927] text-[32px] font-bold font-[' text-center mb-8">Top most interesting Certification</h2>
           
@@ -51,7 +51,6 @@ const EducationLandingPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Course Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {[
               {
@@ -138,7 +137,7 @@ const EducationLandingPage: React.FC = () => {
             </button>
           </div>
         </div>
-      </section>
+      </section> */}
       
       {/* Get Best Education Section */}
       <section className="py-16 bg-gray-50">

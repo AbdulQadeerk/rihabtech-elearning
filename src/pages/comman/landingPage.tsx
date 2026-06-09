@@ -86,9 +86,9 @@ const EducationLandingPage: React.FC = () => {
       <BannerSection/>
 
       {/* Top-Rated Courses Section */}
-      <Fade delay={500}>
+      {/* <Fade delay={500}>
       <Certifications/>
-      </Fade>
+      </Fade> */}
       
       {/* Get Best Education Section */}
       <Courses/>
