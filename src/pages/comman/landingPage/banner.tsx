@@ -3,6 +3,7 @@ import { Search, List } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
 import { Button } from "../../../components/ui/button";
 import { courseApiService, Category, SearchCourseResponse } from "../../../utils/courseApiService";
+import { htmlToText } from "../../../lib/utils";
 
 export default function BannerSection() {
   const [searchTxt, setSearchTxt] = useState("");
@@ -20,7 +21,8 @@ export default function BannerSection() {
     const fetchCategories = async () => {
       const data = await courseApiService.getPublicCategories();
       setisCategoriesloading(false);
-      setCategories(data);
+      // Sort categories alphabetically
+      setCategories([...data].sort((a, b) => (a.title || '').localeCompare(b.title || '')));
     };
     fetchCategories();
   }, []);
@@ -68,7 +70,17 @@ export default function BannerSection() {
       try {
         setLoading(true);
         const results = await courseApiService.searchCourses({ searchText: searchTxt });
-        setFilteredCourses(results);
+        
+        // Apply client-side filtering since the API may return irrelevant results
+        const searchLower = searchTxt.toLowerCase().trim();
+        const clientFiltered = results.filter(course => 
+          (course.title && course.title.toLowerCase().includes(searchLower)) ||
+          (course.description && course.description.toLowerCase().includes(searchLower)) ||
+          (course.category && course.category.toLowerCase().includes(searchLower)) ||
+          (course.subCategory && course.subCategory.toLowerCase().includes(searchLower))
+        );
+        
+        setFilteredCourses(clientFiltered);
       } catch (error) {
         console.error("Error searching courses:", error);
         setFilteredCourses([]);
@@ -153,6 +165,7 @@ export default function BannerSection() {
                   className="w-[500px] bg-white p-4 max-h-96 overflow-auto shadow-xl rounded-xl"
                   onOpenAutoFocus={(e) => e.preventDefault()}
                   align="start"
+                  side="bottom"
                   sideOffset={4}
                 >
                   {loading ? (
@@ -189,10 +202,9 @@ export default function BannerSection() {
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-semibold text-gray-900 line-clamp-2">{course.title}</h3>
                           {course.description && (
-                            <p 
-                              className="text-xs text-gray-600 w-64 truncate mt-1"
-                              dangerouslySetInnerHTML={{ __html: course.description }}
-                            />
+                            <p className="text-xs text-gray-600 w-full line-clamp-2 mt-1">
+                              {htmlToText(course.description)}
+                            </p>
                           )}
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {course.category && (

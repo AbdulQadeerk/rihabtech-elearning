@@ -535,14 +535,49 @@ IconListItem.displayName = "IconListItem";
 export const CoursesMenu: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<Record<number, number>>({});
+  const [subCategoryCounts, setSubCategoryCounts] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    courseApiService.getPublicCategories().then((data) => {
-      setCategories(data);
-    });
-    courseApiService.getPublicSubCategories().then((data) => {
-      setSubCategories(data);
-    });
+    const fetchData = async () => {
+      try {
+        const [cats, subCats, courses] = await Promise.all([
+          courseApiService.getPublicCategories(),
+          courseApiService.getPublicSubCategories(),
+          courseApiService.getAllPublicCourses()
+        ]);
+        
+        // Calculate counts
+        const catCounts: Record<number, number> = {};
+        const subCatCounts: Record<number, number> = {};
+        
+        courses.forEach((course: any) => {
+          if (course.category) {
+            catCounts[course.category] = (catCounts[course.category] || 0) + 1;
+          }
+          if (course.subCategory) {
+            subCatCounts[course.subCategory] = (subCatCounts[course.subCategory] || 0) + 1;
+          }
+        });
+        
+        setCategoryCounts(catCounts);
+        setSubCategoryCounts(subCatCounts);
+
+        // Sort categories alphabetically
+        setCategories([...cats].sort((a, b) => (a.title || '').localeCompare(b.title || '')));
+        
+        // Sort subcategories alphabetically
+        setSubCategories([...subCats].sort((a, b) => {
+          const titleA = a.title || a.name || a.subCategoryName || '';
+          const titleB = b.title || b.name || b.subCategoryName || '';
+          return titleA.localeCompare(titleB);
+        }));
+      } catch (error) {
+        console.error("Error fetching menu data:", error);
+      }
+    };
+    
+    fetchData();
   }, []);
 
   return (
@@ -553,28 +588,35 @@ export const CoursesMenu: React.FC = () => {
       <NavigationMenuContent className="bg-white shadow-lg rounded-md w-full">
         <div className="grid w-[400px] gap-6 p-6 md:w-[600px] h-96 overflow-y-scroll md:grid-cols-2 z-50">
           {/* Loop through categories */}
-                  {categories.map((category) => {
+          {categories.map((category) => {
             const relatedSubs = subCategories.filter(
               (sub) => sub.categoryId === category.id
             );
 
             return (
               <div key={category.id} className="col-span-1 space-y-6">
-                <div className="text-[#677489] text-xs font-medium font-['Urbanist'] uppercase leading-[21px] mb-3">
-                  {category.title}
-                </div>
+                <a 
+                  href={`#/courselist/${category.id}`}
+                  className="block text-[#677489] text-xs font-medium font-['Urbanist'] uppercase leading-[21px] mb-3 hover:text-primary transition-colors"
+                >
+                  {category.title} {categoryCounts[category.id] !== undefined ? `(${categoryCounts[category.id]})` : '(0)'}
+                </a>
                 <ul className="space-y-1">
-                  {relatedSubs.map((sub) => (
-                    <IconListItem
-                      key={sub.id}
-                              title={sub.title || sub.name || sub.subCategoryName || 'No title'}
-                      href={`#/courselist/${category.id}`} // 🔑 update route as needed
-                      icon={null} // or your icon
-                    //image={null} // if you have images
-                    >
-                              {sub.title || sub.name || sub.subCategoryName || 'No Courses Available'}
-                    </IconListItem>
-                  ))}
+                  {relatedSubs.map((sub) => {
+                    const subTitle = sub.title || sub.name || sub.subCategoryName || 'No title';
+                    const count = subCategoryCounts[sub.id] !== undefined ? subCategoryCounts[sub.id] : 0;
+                    return (
+                      <IconListItem
+                        key={sub.id}
+                        title={`${subTitle} (${count})`}
+                        href={`#/courselist/${category.id}`} // 🔑 update route as needed
+                        icon={null} // or your icon
+                      //image={null} // if you have images
+                      >
+                        {subTitle}
+                      </IconListItem>
+                    );
+                  })}
                 </ul>
               </div>
             );
