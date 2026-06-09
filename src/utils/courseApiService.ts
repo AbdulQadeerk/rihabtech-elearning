@@ -298,7 +298,7 @@ export interface CourseGetAllResponse {
 }
 
 export interface SearchCourseRequest {
-  searchText?: string;
+  searchTxt?: string;
 }
 
 export interface SearchCourseResponse {

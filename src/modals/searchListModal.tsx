@@ -78,7 +78,26 @@ export default function SearchWithPopup() {
     const searchCourses = async () => {
       try {
         setLoading(true);
-        const results = await courseApiService.searchCourses({ searchText: searchTxt });
+        let results = await courseApiService.searchCourses({ searchTxt: searchTxt });
+        
+        // Sort to put exact title matches first
+        const searchLower = searchTxt.toLowerCase().trim();
+        results.sort((a, b) => {
+          const aTitle = (a.title || '').toLowerCase();
+          const bTitle = (b.title || '').toLowerCase();
+          
+          const aTitleMatch = aTitle.includes(searchLower) ? 1 : 0;
+          const bTitleMatch = bTitle.includes(searchLower) ? 1 : 0;
+
+          if (aTitleMatch !== bTitleMatch) {
+            return bTitleMatch - aTitleMatch; // Priority to title match
+          }
+          if (aTitleMatch && bTitleMatch) {
+             return aTitle.indexOf(searchLower) - bTitle.indexOf(searchLower);
+          }
+          return 0;
+        });
+
         setFilteredResults(results.map(course => ({
           type: 'course' as const,
           course

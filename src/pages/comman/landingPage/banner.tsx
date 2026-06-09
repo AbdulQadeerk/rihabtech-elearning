@@ -69,7 +69,7 @@ export default function BannerSection() {
     const searchCourses = async () => {
       try {
         setLoading(true);
-        const results = await courseApiService.searchCourses({ searchText: searchTxt });
+        let results = await courseApiService.searchCourses({ searchTxt: searchTxt });
         
         // Apply client-side filtering since the API may return irrelevant results
         const searchLower = searchTxt.toLowerCase().trim();
@@ -80,6 +80,23 @@ export default function BannerSection() {
           (course.subCategory && course.subCategory.toLowerCase().includes(searchLower))
         );
         
+        // Sort to put exact title matches first
+        clientFiltered.sort((a, b) => {
+          const aTitle = (a.title || '').toLowerCase();
+          const bTitle = (b.title || '').toLowerCase();
+          
+          const aTitleMatch = aTitle.includes(searchLower) ? 1 : 0;
+          const bTitleMatch = bTitle.includes(searchLower) ? 1 : 0;
+
+          if (aTitleMatch !== bTitleMatch) {
+            return bTitleMatch - aTitleMatch; // Priority to title match
+          }
+          if (aTitleMatch && bTitleMatch) {
+             return aTitle.indexOf(searchLower) - bTitle.indexOf(searchLower);
+          }
+          return 0;
+        });
+
         setFilteredCourses(clientFiltered);
       } catch (error) {
         console.error("Error searching courses:", error);
