@@ -42,6 +42,7 @@ export default function Courses() {
   const [courses, setCourses] = useState<CourseGetAllResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [coursesLoading, setCoursesLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState<number>(8);
 
   // Function to fetch featured courses from API
   const fetchCourses = async () => {
@@ -60,7 +61,7 @@ export default function Courses() {
 
   // Function to get filtered courses based on selected category
   const getFilteredCourses = useCallback(() => {
-    if (!activeTab || activeTab === '') {
+    if (!activeTab || activeTab === '' || activeTab === 'all') {
       return courses; // Show all courses if no category is selected
     }
 
@@ -84,19 +85,15 @@ export default function Courses() {
         console.log('Raw fetched categories:', fetchedCategories);
 
         // Filter categories that should show on home page (isActive and showOnHomePage)
-        const categoriesToShow = fetchedCategories.filter(category =>
-          category.showOnHomePage
-        );
+        const categoriesToShow = fetchedCategories
+          .filter(category => category.showOnHomePage)
+          .sort((a, b) => a.title.localeCompare(b.title));
 
         console.log('Processed categories:', categoriesToShow);
         setCategories(categoriesToShow);
 
-        // Set the first category as active if available
-        if (categoriesToShow.length > 0) {
-          const firstCategoryId = categoriesToShow[0].id;
-          console.log('Setting active tab to:', firstCategoryId);
-          setActiveTab(firstCategoryId.toString());
-        }
+        // Set 'all' as the default active tab
+        setActiveTab('all');
       } catch (error) {
         console.error("Error fetching categories:", error);
       } finally {
@@ -112,6 +109,7 @@ export default function Courses() {
   useEffect(() => {
     console.log('Active tab changed to:', activeTab);
     console.log('Filtered courses count:', getFilteredCourses().length);
+    setVisibleCount(8);
   }, [activeTab, courses, getFilteredCourses]);
 
   return (
@@ -126,6 +124,12 @@ export default function Courses() {
         ) : categories.length > 0 ? (
           <>
             <div className="grid grid-cols-3 md:grid-cols-8 gap-2 justify-start mb-8">
+              <div 
+                className={`rounded-[35px] px-2 md:px-4 flex items-center justify-center cursor-pointer ${activeTab === 'all' ? 'bg-primary text-white' : 'bg-white text-primary'}`} 
+                onClick={() => setActiveTab('all')}
+              >
+                <h2 className="flex flex-row justify-center text-center text-sm md:text-md font-medium font-['Archivo'] capitalize">All</h2>
+              </div>
               {categories.map((category, index) => (
                 <div key={index} className={`rounded-[35px] px-2 md:px-4 flex items-center justify-center cursor-pointer ${activeTab === category.id.toString() ? 'bg-primary text-white' : 'bg-white text-primary'}`} onClick={() => {
                   setActiveTab(category.id.toString());
@@ -149,7 +153,7 @@ export default function Courses() {
           ) : getFilteredCourses().length > 0 ? (
             <>
               {/* API Courses */}
-              {getFilteredCourses().map((course, index) => (
+              {getFilteredCourses().slice(0, visibleCount).map((course, index) => (
                 <div
                   key={`api-${index}`}
                   className="course-card-alt"
@@ -202,7 +206,16 @@ export default function Courses() {
         {getFilteredCourses().length === 0 ? (<div className="text-center py-8">
               <p className="text-gray-600">No courses available for this category.</p>
             </div>):null}
-        <div className="w-full flex justify-center">
+        <div className="w-full flex justify-center gap-4">
+          {getFilteredCourses().length > visibleCount && (
+            <Button 
+              variant={'outline'} 
+              className="border-primary text-primary rounded-none px-4 py-2 text-sm font-medium hover:bg-blue-50" 
+              onClick={() => setVisibleCount(prev => prev + 8)}
+            >
+              Show More ({getFilteredCourses().length - visibleCount})
+            </Button>
+          )}
           <Button variant={'outline'} className="border-black text-black rounded-none px-4 py-2 text-sm font-medium hover:bg-blue-50" onClick={() => {
             window.location.href = '/#/courselist';
             window.scrollTo({ top: 0, behavior: 'smooth' })// Scroll to the top of the page
