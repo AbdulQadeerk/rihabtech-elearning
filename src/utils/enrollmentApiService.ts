@@ -26,6 +26,9 @@ export interface UserEnrollment {
   progress?: number; // Progress percentage (0-100)
   totalWatchTime?: number; // Total watch time in seconds
   lastAccessedAt?: string; // Last accessed date
+  validityType?: 'Plan' | 'Custom';
+  validTill?: string;
+  planName?: string;
 }
 
 class EnrollmentApiService {

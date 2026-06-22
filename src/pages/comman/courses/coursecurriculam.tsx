@@ -240,7 +240,7 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
               {courseSections.reduce((total, section) => 
-                total + section.lectures.filter(l => l.type === 'video' && l.videoUrl).length, 0
+                total + section.lectures.filter(l => l.type === 'video' && l.isPromotional).length, 0
               )}
             </div>
             <div className="text-green-700">Preview Videos</div>
@@ -248,7 +248,7 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-600">
               {courseSections.reduce((total, section) => 
-                total + section.lectures.filter(l => l.type === 'video' && !l.videoUrl).length, 0
+                total + section.lectures.filter(l => l.type === 'video' && !l.isPromotional).length, 0
               )}
             </div>
             <div className="text-orange-700">Full Access Only</div>

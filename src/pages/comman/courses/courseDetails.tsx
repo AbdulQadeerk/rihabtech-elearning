@@ -456,7 +456,7 @@ export default function CourseDetails() {
     }
 
     // For paid courses, check subscription
-    if (!activePlan || (activePlan.categoryId && activePlan.categoryId.toString() !== course?.category?.toString())) {
+    if (!activePlan || (activePlan.categoryId && activePlan.categoryId.toString() !== '0' && activePlan.categoryId.toString() !== course?.category?.toString())) {
       return {
         text: "Enroll Now",
         action: handleSubscribeNow,

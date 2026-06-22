@@ -24,6 +24,7 @@ export default function HomePage() {
     progress: number;
     enrolledAt: Date;
     lastAccessed: Date;
+    validTill?: string;
   }
   const [enrolledCourses, setEnrolledCourses] = useState<HomepageCourse[]>([]);
   const [recommendedCourses, setRecommendedCourses] = useState<CourseGetAllResponse[]>([]);
@@ -112,6 +113,7 @@ export default function HomePage() {
                 progress: progressValue,
                 enrolledAt: new Date(enrollment.enrolledDate),
                 lastAccessed: lastAccessedDate,
+                validTill: enrollment.validTill,
               };
             } catch (err) {
               console.error(`Error loading course ${enrollment.courseId}:`, err);
@@ -202,6 +204,7 @@ export default function HomePage() {
               progress: progress?.progress || 0,
               enrolledAt: new Date(enrollment.enrolledDate),
               lastAccessed: progress?.lastAccessedAt ? new Date(progress.lastAccessedAt) : new Date(enrollment.enrolledDate),
+              validTill: enrollment.validTill,
             };
           } catch (err) {
             console.error(`Error loading course ${enrollment.courseId}:`, err);
@@ -496,10 +499,16 @@ export default function HomePage() {
                   </div>
                   <div className="course-details-section">
                     <div className="course-content">
-                      <div className="course-students">
+                      <div className="course-students flex justify-between items-center">
                         <div className="py-0.5 flex gap-2 items-center">
                           <span>{course.progress?.toFixed(0) ?? 0}% complete</span>
                         </div>
+                        {course.validTill && (
+                          <div className="py-0.5 flex gap-1 items-center text-orange-600 text-xs font-semibold bg-orange-50 px-2 rounded-full border border-orange-200">
+                            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                            <span>Active till {new Date(course.validTill).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </div>
+                        )}
                       </div>
                       <h3 className="course-title line-clamp-2">{course.title}</h3>
                     </div>

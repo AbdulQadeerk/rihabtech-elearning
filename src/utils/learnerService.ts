@@ -18,6 +18,7 @@ export interface LearnerCourse {
   enrollmentDate?: any;
   lastAccessed?: any;
   completionPercentage?: number;
+  validTill?: string;
 }
 
 export interface WishlistItem {
@@ -122,6 +123,9 @@ class LearnerService {
       enrollmentDate: enrollmentData?.enrolledAt,
       lastAccessed: enrollmentData?.lastAccessedAt,
       completionPercentage: progressPercent, // ✅ also use here
+      validTill: enrollmentData?.validTill?.toDate ? enrollmentData.validTill.toDate().toISOString() : 
+                 (enrollmentData?.endDate?.toDate ? enrollmentData.endDate.toDate().toISOString() : 
+                 (enrollmentData?.validTill || enrollmentData?.endDate)),
     });
   }
 }

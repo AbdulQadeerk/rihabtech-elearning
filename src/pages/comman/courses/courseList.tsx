@@ -779,6 +779,7 @@ export function CourseCard({ course, progress = false }: {
     pricing?: string;
     enrolments?: number;
     weeks?: number;
+    validTill?: string;
   }; 
   progress?: boolean 
 }) {
@@ -849,13 +850,19 @@ export function CourseCard({ course, progress = false }: {
       <div className="course-details-section">
         <div className="course-content">
           {/* Course Meta Info */}
-          <div className="course-students mb-2">
+          <div className="course-students flex justify-between items-center mb-2">
             <div className="flex items-center gap-4 text-xs text-[#666666]">
               <div className="flex items-center gap-1">
                 <User2 size={14} />
                 <span>{formatStudentCount(studentCount)} Students</span>
               </div>
             </div>
+            {progress && (course as any).validTill && (
+              <div className="py-0.5 flex gap-1 items-center text-orange-600 text-xs font-semibold bg-orange-50 px-2 rounded-full border border-orange-200">
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                <span>Active till {new Date((course as any).validTill).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+            )}
           </div>
           
           {/* Course Title */}

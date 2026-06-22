@@ -18,6 +18,8 @@ import { getLevelLabel } from '../../../utils/levels';
 import { reviewApiService, ReviewStats } from '../../../utils/reviewApiService';
 import { certificateApiService, Certificate } from '../../../utils/certificateApiService';
 import { instructorPayoutApiService } from '../../../utils/instructorPayoutApiService';
+import { enrollmentApiService } from '../../../utils/enrollmentApiService';
+import { toast } from "sonner";
 
 // Helper function to extract YouTube video ID from URL
 const extractYouTubeVideoId = (url: string): string => {
@@ -94,7 +96,23 @@ export default function CourseDetailsPage() {
     }
   }, [location, courseId]);
 
-
+  // Verify access rights to prevent watching if subscription expired
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!courseId || !user) return;
+      try {
+        const result = await enrollmentApiService.checkEnrollment(parseInt(courseId));
+        if (!result.isEnrolled || !result.hasAccess) {
+          // If they lost access (e.g. subscription expired), redirect to course details
+          toast.error("Your plan expired. Buy plan to continue watching");
+          window.location.hash = `#/courseDetails?courseId=${courseId}`;
+        }
+      } catch (err) {
+        console.error("Failed to check access:", err);
+      }
+    };
+    checkAccess();
+  }, [courseId, user]);
 
   // Get course ID from URL params or use a default for testing
   // In a real app, you'd get this from React Router or props
