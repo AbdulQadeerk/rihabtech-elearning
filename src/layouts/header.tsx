@@ -289,12 +289,10 @@ function Header({ onMenuClick }: HeaderProps) {
                               <div className="flex items-center space-x-2 mb-1">
                                 <span className="text-gray-500 text-xs font-medium">Valid till</span>
                                 <span className="bg-gradient-to-r from-orange-600 to-amber-600 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm hover:shadow-md hover:shadow-orange-500/25 transition-all duration-200 transform hover:scale-105 animate-pulse">
-                                  {plan.endDate ? new Date(plan.endDate).toLocaleString('en-US', {
+                                  {plan.endDate ? new Date(plan.endDate).toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
-                                    year: 'numeric',
-                                    hour: 'numeric',
-                                    minute: '2-digit'
+                                    year: 'numeric'
                                   }) : 'N/A'}
                                 </span>
                               </div>
