@@ -1486,7 +1486,9 @@ export default function CourseDetailsPage() {
                 <select value={playbackRate} onChange={(e) => setPlaybackRate(parseFloat(e.target.value))} className="bg-gray-700 text-white rounded px-2 py-1">
                   <option value="0.25">0.25x</option>
                   <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
                   <option value="1" selected>1x</option>
+                  <option value="1.25">1.25x</option>
                   <option value="1.5">1.5x</option>
                   <option value="2">2x</option>
                 </select>
@@ -2120,8 +2122,8 @@ export default function CourseDetailsPage() {
                         key={module.id || itemIndex}
                         onClick={() => selectModule(sectionIndex, itemIndex, module)}
                         className={`relative pl-12 pr-4 py-3 cursor-pointer transition-colors border-l-2 ${isActive
-                            ? 'bg-orange-50 border-orange-500'
-                            : 'border-transparent hover:bg-gray-100'
+                          ? 'bg-orange-50 border-orange-500'
+                          : 'border-transparent hover:bg-gray-100'
                           } ${module.completed ? 'bg-green-50' : ''}`}
                       >
                         {/* Module icon and completion indicator */}
@@ -2436,8 +2438,8 @@ export default function CourseDetailsPage() {
                     <button
                       key={tab}
                       className={`px-4 py-2 text-sm font-medium rounded-full shadow-sm border whitespace-nowrap ${activeTab === tab
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : "text-gray-600 border-orange-500 bg-white hover:bg-orange-50"
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "text-gray-600 border-orange-500 bg-white hover:bg-orange-50"
                         }`}
                       onClick={() => setActiveTab(tab)}
                     >
@@ -2452,8 +2454,8 @@ export default function CourseDetailsPage() {
                     <button
                       key={tab}
                       className={`px-4 py-2 text-sm font-medium rounded-full shadow-sm border whitespace-nowrap ${activeTab === tab
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : "text-gray-600 border-orange-500 bg-white hover:bg-orange-50"
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "text-gray-600 border-orange-500 bg-white hover:bg-orange-50"
                         }`}
                       onClick={() => setActiveTab(tab)}
                     >

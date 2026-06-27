@@ -2687,7 +2687,12 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                               formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].description`, val);
                                                                             }
                                                                           }}
-                                                                          onBlur={() => setEditLecture(null)}
+                                                                          onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') {
+                                                                              e.preventDefault();
+                                                                              setEditLecture(null);
+                                                                            }
+                                                                          }}
                                                                           autoFocus
                                                                         />
                                                                       </div>
