@@ -49,9 +49,10 @@ interface CoursePreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   course: Course;
+  instructorName?: string;
 }
 
-export default function CoursePreviewModal({ isOpen, onClose, course }: CoursePreviewModalProps) {
+export default function CoursePreviewModal({ isOpen, onClose, course, instructorName }: CoursePreviewModalProps) {
   const [selectedVideo, setSelectedVideo] = useState<PreviewVideo | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -86,9 +87,14 @@ export default function CoursePreviewModal({ isOpen, onClose, course }: CoursePr
                       file.url.toLowerCase().includes('.mp4') ||
                       file.url.toLowerCase().includes('.mov') ||
                       file.url.toLowerCase().includes('.avi') ||
+                      file.url.toLowerCase().includes('.mkv') ||
+                      file.url.toLowerCase().includes('.webm') ||
                       file.name?.toLowerCase().includes('.mp4') ||
                       file.name?.toLowerCase().includes('.mov') ||
-                      file.name?.toLowerCase().includes('.avi')
+                      file.name?.toLowerCase().includes('.avi') ||
+                      file.url.toLowerCase().includes('bunny') ||
+                      file.url.toLowerCase().includes('cloudinary') ||
+                      true // Accept any url for contentFiles under contentType==='video'
                     );
                     console.log('Checking file:', file, 'isVideo:', isVideo);
                     return isVideo;
@@ -174,6 +180,51 @@ export default function CoursePreviewModal({ isOpen, onClose, course }: CoursePr
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.round((seconds % 60) * 100) / 100; // Round to 2 decimal places
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toFixed(2).padStart(5, '0')}`;
+  };
+
+  const getCourseDuration = (): string => {
+    if (!course?.curriculum?.sections) return "Not specified";
+    let totalSeconds = 0;
+    course.curriculum.sections.forEach(section => {
+      if (section.items) {
+        section.items.forEach(item => {
+          if (item.contentFiles && item.contentFiles.length > 0) {
+            item.contentFiles.forEach(file => {
+              if (file.duration !== undefined && file.duration !== null) {
+                let durationValue: number;
+                if (typeof file.duration === 'string') {
+                  const durationStr = file.duration as string;
+                  if (durationStr.includes(':')) {
+                    const parts = durationStr.split(':');
+                    if (parts.length === 2) {
+                      durationValue = parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+                    } else if (parts.length === 3) {
+                      durationValue = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+                    } else {
+                      durationValue = parseFloat(durationStr);
+                    }
+                  } else {
+                    durationValue = parseFloat(durationStr);
+                  }
+                } else {
+                  durationValue = file.duration as number;
+                }
+                if (!isNaN(durationValue) && durationValue > 0) {
+                  totalSeconds += durationValue;
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    if (totalSeconds > 0) {
+      const hours = totalSeconds / 3600;
+      const roundedHours = Math.round(hours * 10) / 10;
+      return `${roundedHours} hours`;
+    }
+    return "Not specified";
   };
 
   const handleVideoSelect = (video: PreviewVideo) => {
@@ -405,16 +456,13 @@ export default function CoursePreviewModal({ isOpen, onClose, course }: CoursePr
                   <div className="flex items-center gap-2">
                     <Clock size={16} className="text-primary" />
                     <span>Duration: <span className="font-medium">
-                      {course.curriculum?.sections ?
-                        `${course.curriculum.sections.length} sections` :
-                        'Not specified'
-                      }
+                      {getCourseDuration()}
                     </span></span>
                   </div>
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-primary" />
                     <span>Instructor: <span className="font-medium">
-                      {course.members?.find(m => m.role === 'teacher')?.email?.split('@')[0] || 'Unknown'}
+                      {instructorName || (course as any).instructorName || (course as any).InstructorName || 'Unknown'}
                     </span></span>
                   </div>
                 </div>

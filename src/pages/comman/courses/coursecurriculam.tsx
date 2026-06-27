@@ -161,15 +161,11 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
         if (item.contentFiles && item.contentFiles.length > 0) {
           const videoFile = item.contentFiles.find(file => {
             const isVideoByType = (file as any).contentType === 'video';
-            const isVideoByName = file.name?.toLowerCase().includes('.mp4') || 
-                                file.name?.toLowerCase().includes('.mov') ||
-                                file.name?.toLowerCase().includes('.avi');
-            const isVideoByUrl = file.url?.toLowerCase().includes('.mp4') || 
-                               file.url?.toLowerCase().includes('.mov') ||
-                               file.url?.toLowerCase().includes('.avi');
+            const isVideoByName = file.name?.toLowerCase().match(/\.(mp4|mov|avi|mkv|webm)$/) != null;
+            const isVideoByUrl = file.url?.toLowerCase().match(/\.(mp4|mov|avi|mkv|webm)$/) != null || file.url?.toLowerCase().includes('bunny') || file.url?.toLowerCase().includes('cloudinary');
             const isVideoByContentType = (file as any).contentType === 'video';
             
-            return isVideoByType || isVideoByName || isVideoByUrl || isVideoByContentType;
+            return isVideoByType || isVideoByName || isVideoByUrl || isVideoByContentType || true; // Accept any content file under video item
           });
           
           if (videoFile) {

@@ -163,6 +163,7 @@ export interface Question {
   question: string;
   options: string[];
   correctOption: number[];
+  isMultipleChoice?: boolean;
 }
 
 export interface QuizItem {
@@ -889,12 +890,16 @@ const transformApiCurriculumToForm = (curriculum: any) => {
 
           // Transform questions - ensure correctOption is an array
           if (item.questions && Array.isArray(item.questions)) {
-            transformedItem.questions = item.questions.map((q: any) => ({
-              id: q.id,
-              question: q.question || '',
-              options: q.options || [],
-              correctOption: Array.isArray(q.correctOption) ? q.correctOption : (q.correctOption !== undefined ? [q.correctOption] : [])
-            }));
+            transformedItem.questions = item.questions.map((q: any) => {
+              const correctOpts = Array.isArray(q.correctOption) ? q.correctOption : (q.correctOption !== undefined ? [q.correctOption] : []);
+              return {
+                id: q.id,
+                question: q.question || '',
+                options: q.options || [],
+                correctOption: correctOpts,
+                isMultipleChoice: q.isMultipleChoice !== undefined ? q.isMultipleChoice : correctOpts.length > 1
+              };
+            });
           } else {
             transformedItem.questions = [];
           }
@@ -4128,8 +4133,11 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                           type="number"
                                                                           min="1"
                                                                           name={`sections[${sectionIdx}].items[${itemIdx}].duration`}
-                                                                          value={item.duration || 0}
-                                                                          onChange={formik.handleChange}
+                                                                          value={item.duration || ''}
+                                                                          onChange={(e) => {
+                                                                            const val = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+                                                                            formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].duration`, val);
+                                                                          }}
                                                                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                           placeholder="Enter quiz duration in minutes"
                                                                         />
@@ -4143,14 +4151,30 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                             <div className="space-y-4">
                                                                               {item.questions && item.questions.map((question, qIdx) => (
                                                                                 <div key={qIdx} className="border p-3 rounded bg-white">
-                                                                                  <div className="flex justify-between items-start mb-2">
-                                                                                    <Input
-                                                                                      className="ins-control-border"
-                                                                                      placeholder="Question"
-                                                                                      name={`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].question`}
-                                                                                      value={question.question}
-                                                                                      onChange={formik.handleChange}
-                                                                                    />
+                                                                                  <div className="flex justify-between items-start mb-2 w-full gap-2">
+                                                                                    <div className="flex-1">
+                                                                                      <Input
+                                                                                        className="ins-control-border mb-2"
+                                                                                        placeholder="Question"
+                                                                                        name={`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].question`}
+                                                                                        value={question.question}
+                                                                                        onChange={formik.handleChange}
+                                                                                      />
+                                                                                      <select
+                                                                                        className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                        value={question.isMultipleChoice ? 'multiple' : 'single'}
+                                                                                        onChange={(e) => {
+                                                                                          const isMulti = e.target.value === 'multiple';
+                                                                                          formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].isMultipleChoice`, isMulti);
+                                                                                          if (!isMulti && question.correctOption?.length > 1) {
+                                                                                            formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].correctOption`, [question.correctOption[0]]);
+                                                                                          }
+                                                                                        }}
+                                                                                      >
+                                                                                        <option value="single">Single Right Answer</option>
+                                                                                        <option value="multiple">Multiple Right Answers</option>
+                                                                                      </select>
+                                                                                    </div>
                                                                                     {item.questions.length > 1 && (
                                                                                       <Button
                                                                                         type="button"
@@ -4168,24 +4192,39 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                                   <div className="space-y-2">
                                                                                     {item.questions && question.options!.map((option, optIdx) => (
                                                                                       <div key={optIdx} className="flex items-center gap-2">
-                                                                                        <Checkbox
-                                                                                          checked={Array.isArray(question.correctOption) && question.correctOption.includes(optIdx)}
-                                                                                          onCheckedChange={(checked: boolean) => {
-                                                                                            const currentOptions = Array.isArray(question.correctOption)
-                                                                                              ? [...question.correctOption]
-                                                                                              : [];
-
-                                                                                            const updatedOptions = checked
-                                                                                              ? [...currentOptions, optIdx]
-                                                                                              : currentOptions.filter(idx => idx !== optIdx);
-
-                                                                                            formik.setFieldValue(
-                                                                                              `sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].correctOption`,
-                                                                                              updatedOptions
-                                                                                            );
-                                                                                          }}
-                                                                                          className="mt-1"
-                                                                                        />
+                                                                                        {question.isMultipleChoice ? (
+                                                                                          <Checkbox
+                                                                                            checked={Array.isArray(question.correctOption) && question.correctOption.includes(optIdx)}
+                                                                                            onCheckedChange={(checked) => {
+                                                                                              const currentOptions = Array.isArray(question.correctOption)
+                                                                                                ? [...question.correctOption]
+                                                                                                : [];
+                                                                                              
+                                                                                              const updatedOptions = checked
+                                                                                                ? [...currentOptions, optIdx]
+                                                                                                : currentOptions.filter(idx => idx !== optIdx);
+                                                                                              
+                                                                                              formik.setFieldValue(
+                                                                                                `sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].correctOption`,
+                                                                                                updatedOptions
+                                                                                              );
+                                                                                            }}
+                                                                                            className="mt-1"
+                                                                                          />
+                                                                                        ) : (
+                                                                                          <input
+                                                                                            type="radio"
+                                                                                            name={`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].correctOption`}
+                                                                                            checked={Array.isArray(question.correctOption) && question.correctOption.includes(optIdx)}
+                                                                                            onChange={() => {
+                                                                                              formik.setFieldValue(
+                                                                                                `sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].correctOption`,
+                                                                                                [optIdx]
+                                                                                              );
+                                                                                            }}
+                                                                                            className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                                                          />
+                                                                                        )}
                                                                                         <Input
                                                                                           className="ins-control-border flex-1"
                                                                                           placeholder={`Option ${optIdx + 1}`}

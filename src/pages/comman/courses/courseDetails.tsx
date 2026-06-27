@@ -244,7 +244,7 @@ export default function CourseDetails() {
 
   // Function to get instructor name
   const getInstructorName = (): string => {
-    return instructor?.name || "Unknown Instructor";
+    return instructor?.name || (course as any)?.instructorName || (course as any)?.InstructorName || "Unknown Instructor";
   };
 
   // Function to get instructor email
@@ -1160,6 +1160,7 @@ export default function CourseDetails() {
           isOpen={isPreviewModalOpen}
           onClose={() => setIsPreviewModalOpen(false)}
           course={course as any}
+          instructorName={getInstructorName()}
         />
       )}
 

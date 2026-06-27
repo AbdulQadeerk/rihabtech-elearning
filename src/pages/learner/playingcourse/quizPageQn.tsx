@@ -637,20 +637,39 @@ const QuizPage: React.FC<QuizPageProps> = ({
 
               <div className="space-y-3 mb-8">
                 {currentQuestion.type === 'multiple_choice' ? (
-                  currentQuestion.options?.map((option, index) => (
+                  currentQuestion.options?.map((option, index) => {
+                    const isSingleChoice = currentQuestion.correctOption && currentQuestion.correctOption.length <= 1;
+                    
+                    return (
                     <label
                       key={index}
                       className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                     >
-                      <Checkbox
-                        checked={selectedAnswers[currentQuestionIndex]?.includes(index) || false}
-                        onChange={() => handleAnswerSelect(currentQuestionIndex, index)}
-                        onCheckedChange={()=>handleAnswerSelect(currentQuestionIndex, index)}
-                        className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
-                      />
+                      {isSingleChoice ? (
+                        <input
+                          type="radio"
+                          name={`question-${currentQuestionIndex}`}
+                          checked={selectedAnswers[currentQuestionIndex]?.includes(index) || false}
+                          onChange={() => {
+                            const updatedAnswers = {
+                              ...selectedAnswers,
+                              [currentQuestionIndex]: [index]
+                            };
+                            setSelectedAnswers(updatedAnswers);
+                            saveProgress(updatedAnswers, essayAnswers);
+                          }}
+                          className="mt-1 mr-3 w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      ) : (
+                        <Checkbox
+                          checked={selectedAnswers[currentQuestionIndex]?.includes(index) || false}
+                          onCheckedChange={() => handleAnswerSelect(currentQuestionIndex, index)}
+                          className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
+                        />
+                      )}
                       <span className="text-gray-700">{option}</span>
                     </label>
-                  ))
+                  )})
                 ) : (
                   <div className="space-y-4">
                     <div className="bg-blue-50 p-4 rounded-lg">
