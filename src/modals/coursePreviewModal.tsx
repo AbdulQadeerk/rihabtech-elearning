@@ -344,8 +344,15 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
                     width="100%"
                     height="100%"
                     className="rounded-lg"
+                    playing={true}
                     onReady={handleVideoReady}
                     onError={handleVideoError}
+                    onEnded={() => {
+                      const currentIndex = previewVideos.findIndex(v => v.id === selectedVideo.id);
+                      if (currentIndex !== -1 && currentIndex < previewVideos.length - 1) {
+                        handleVideoSelect(previewVideos[currentIndex + 1]);
+                      }
+                    }}
                     config={{
                       youtube: {
                         playerVars: {

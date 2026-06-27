@@ -1232,6 +1232,20 @@ export default function CourseDetailsPage() {
     }
 
     console.log("Video completed");
+
+    // Auto-play next video
+    const nextModule = findNextModule(activeModule?.sectionIndex || 0, activeModule?.itemIndex || 0);
+    if (nextModule) {
+      setTimeout(() => {
+        selectModule(nextModule.sectionIndex, nextModule.itemIndex, {
+          ...nextModule.module,
+          sectionId: enrichedCourseData?.curriculum?.sections?.[nextModule.sectionIndex]?.id
+        });
+        setCurrentTime(0);
+        setTotalWatched(0);
+        setIsPlaying(true);
+      }, 1000);
+    }
   };
 
   const handleSeek = (seconds: number) => {
