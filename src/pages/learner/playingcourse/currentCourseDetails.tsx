@@ -1408,20 +1408,15 @@ export default function CourseDetailsPage() {
             {/* Progress Bar */}
             <div
               ref={progressBarRef}
-              className="w-full h-2 bg-white rounded-full mb-2 cursor-pointer"
+              className="w-full h-2 bg-gray-500 bg-opacity-50 rounded-full mb-2 cursor-pointer relative group"
               onClick={handleProgressBarClick}
             >
-              <div
-                className="h-full bg-blue-500 rounded-full"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
-
-              {/* Watched segments indicator */}
-              <div className="relative h-full w-full -mt-2">
+              {/* Watched segments indicator (Background) */}
+              <div className="absolute top-0 left-0 h-full w-full pointer-events-none rounded-full overflow-hidden">
                 {watchedSegments.map((segment, idx) => (
                   <div
                     key={idx}
-                    className="absolute h-full bg-primary rounded-full"
+                    className="absolute h-full bg-primary opacity-40 rounded-full"
                     style={{
                       left: `${(segment.start / duration) * 100}%`,
                       width: `${((segment.end - segment.start) / duration) * 100}%`
@@ -1429,6 +1424,18 @@ export default function CourseDetailsPage() {
                   />
                 ))}
               </div>
+
+              {/* Current time bar (Foreground) */}
+              <div
+                className="absolute top-0 left-0 h-full bg-primary rounded-full pointer-events-none"
+                style={{ width: `${(currentTime / duration) * 100}%` }}
+              />
+              
+              {/* Scrubber Thumb */}
+              <div 
+                className="absolute top-1/2 w-3.5 h-3.5 bg-white rounded-full shadow transform -translate-y-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                style={{ left: `${(currentTime / duration) * 100}%` }}
+              />
             </div>
             {/* <div 
             ref={progressBarRef}
