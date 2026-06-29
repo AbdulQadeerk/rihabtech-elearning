@@ -20,9 +20,18 @@ export default function CourseList() {
   const [selectedRatings, setSelectedRatings] = useState<string[]>([]);
   const [selectedPrice, setSelectedPrice] = useState<string[]>([]);
   const [selectedDuration, setSelectedDuration] = useState<string[]>([]);
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+    const { categoryId, subCategoryId } = useParams<{ categoryId?: string, subCategoryId?: string }>();
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(subCategoryId ? [subCategoryId] : []);
     const [categoryName, setcategoryName] = useState<string | null>(null);
-    const { categoryId } = useParams<{ categoryId?: string }>();
+
+  // Sync subCategoryId from URL to selectedTopics when URL changes
+  useEffect(() => {
+    if (subCategoryId) {
+      setSelectedTopics([subCategoryId]);
+    } else {
+      setSelectedTopics([]);
+    }
+  }, [subCategoryId]);
   
   const toggleFilter = () => setIsFilterOpen(!isFilterOpen);
 

@@ -144,6 +144,14 @@ function App() {
   }
 />
         <Route
+  path="/courselist/:categoryId/:subCategoryId"
+  element={
+    <CommanLayout>
+      <CourseList />
+    </CommanLayout>
+  }
+/>
+        <Route
           path="/courseDetails"
           element={
             <CommanLayout>

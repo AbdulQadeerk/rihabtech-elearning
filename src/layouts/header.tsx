@@ -609,7 +609,7 @@ export const CoursesMenu: React.FC = () => {
                       <IconListItem
                         key={sub.id}
                         title={`${subTitle} (${count})`}
-                        href={`#/courselist/${category.id}`} // 🔑 update route as needed
+                        href={`#/courselist/${category.id}/${sub.id}`} // 🔑 update route as needed
                         icon={null} // or your icon
                       //image={null} // if you have images
                       >
