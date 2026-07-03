@@ -110,7 +110,7 @@ const EducationLandingPage: React.FC = () => {
                     </div>
                     <div className="flex items-center text-gray-500 text-sm">
                       <Users className="h-4 w-4 mr-1" />
-                      <span>{course.students}</span>
+                      <span>{(course as any).enrolments || (course as any).enrollment || course.students || 0} Students</span>
                     </div>
                     <div className="flex items-center text-gray-500 text-sm ml-3">
                       <Clock className="h-4 w-4 mr-1" />

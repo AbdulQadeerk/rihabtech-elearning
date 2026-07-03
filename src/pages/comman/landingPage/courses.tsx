@@ -172,7 +172,7 @@ export default function Courses() {
                       <div className="course-meta">
                         <div className="flex items-center gap-2">
                           <User2 size={16} />
-                          <span>{course.enrolments} Students</span>
+                          <span>{course.enrolments || (course as any).enrollment || (course as any).students || 0} Students</span>
                         </div>
                       </div>
                       <div className="course-description" >{htmlToText(course.description??'')}</div>

@@ -22,7 +22,9 @@ export default function CourseList() {
   const [selectedDuration, setSelectedDuration] = useState<string[]>([]);
     const { categoryId, subCategoryId } = useParams<{ categoryId?: string, subCategoryId?: string }>();
   const [selectedTopics, setSelectedTopics] = useState<string[]>(subCategoryId ? [subCategoryId] : []);
-    const [categoryName, setcategoryName] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(categoryId ? [categoryId] : []);
+  const [categoryName, setcategoryName] = useState<string | null>(null);
+  const [subCategoryName, setSubCategoryName] = useState<string | null>(null);
 
   // Sync subCategoryId from URL to selectedTopics when URL changes
   useEffect(() => {
@@ -76,7 +78,9 @@ export default function CourseList() {
         };
         
         // Category filter
-        if (categoryId) {
+        if (selectedCategories.length > 0) {
+          filters.category = parseInt(selectedCategories[0]);
+        } else if (categoryId) {
           filters.category = parseInt(categoryId);
         }
         
@@ -137,6 +141,7 @@ export default function CourseList() {
           
           if (subCatIds.length > 0) {
             filters.subCategories = subCatIds;
+            filters.subCategory = subCatIds[0]; // Set single subCategory for backward compatibility
           }
         }
         
@@ -162,33 +167,47 @@ export default function CourseList() {
     };
 
     fetchCourses();
-  }, [categoryId, selectedPrice, selectedDuration, selectedTopics, selectedRatings]); // Re-fetch when filters change
+  }, [categoryId, selectedCategories, selectedPrice, selectedDuration, selectedTopics, selectedRatings]); // Re-fetch when filters change
 
-     useEffect(() => {
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const fetchedCategories = await courseApiService.getPublicCategories();
-      console.log('Raw fetched categories:', fetchedCategories);
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        const fetchedCategories = await courseApiService.getPublicCategories();
+        console.log('Raw fetched categories:', fetchedCategories);
 
-      // ✅ find category by ID
-      const categoryIdNumber = categoryId ? parseInt(categoryId, 10) : undefined;
-      const category = fetchedCategories.find((c: any) => c.id === categoryIdNumber);
+        // ✅ find category by ID
+        const categoryIdNumber = categoryId ? parseInt(categoryId, 10) : undefined;
+        const category = fetchedCategories.find((c: any) => c.id === categoryIdNumber);
 
-      console.log('Processed category:', category);
-      if (category) {
-        setcategoryName(category.title);
+        console.log('Processed category:', category);
+        if (category) {
+          setcategoryName(category.title);
+        } else {
+          setcategoryName(null);
+        }
+
+        // ✅ find subcategory by ID
+        if (subCategoryId) {
+          const fetchedSubCategories = await courseApiService.getPublicSubCategories();
+          const subCategoryIdNumber = parseInt(subCategoryId, 10);
+          const subCategory = fetchedSubCategories.find((c: any) => c.id === subCategoryIdNumber);
+          if (subCategory) {
+            setSubCategoryName(subCategory.title || subCategory.name || subCategory.subCategoryName || null);
+          }
+        } else {
+          setSubCategoryName(null);
+        }
+
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchCategories();
-}, [categoryId]);
+    fetchCategories();
+  }, [categoryId, subCategoryId]);
 
   // Apply client-side filters (only for subcategories/topics since API handles others)
   const applyFilters = useCallback(() => {
@@ -265,6 +284,9 @@ export default function CourseList() {
         {/* Filter Sidebar - Desktop */}
         <div className={`hidden lg:block lg:w-1/4 xl:w-1/5 pr-8 ${isFilterOpen ? '' : 'lg:hidden'}`}>
           <FilterContent 
+            categoryId={categoryId}
+            selectedCategories={selectedCategories}
+            setSelectedCategories={setSelectedCategories}
             selectedRatings={selectedRatings}
             setSelectedRatings={setSelectedRatings}
             selectedPrice={selectedPrice}
@@ -278,17 +300,27 @@ export default function CourseList() {
         <div>
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center text-sm">
-              <button className="text-[#000927] text-base font-normal font-['Barlow'] leading-relaxed hover:text-primary">Home</button>
+              <button className="text-[#000927] text-base font-normal font-['Barlow'] leading-relaxed hover:text-primary" onClick={() => window.location.href = '/'}>Home</button>
               <ChevronRight className="h-4 w-4 text-gray-400 mx-2" />
-              <button className="text-[#000927] text-base font-normal font-['Barlow'] leading-relaxed hover:text-primary">Courses</button>
+              <button className="text-[#000927] text-base font-normal font-['Barlow'] leading-relaxed hover:text-primary" onClick={() => window.location.href = '/#/courselist'}>Courses</button>
               <ChevronRight className="h-4 w-4 text-gray-400 mx-2" />
-              <span className="text-gray-500 text-base font-normal font-['Barlow'] leading-relaxed">{categoryName??'All Courses'}</span>
+              {subCategoryName ? (
+                <>
+                  <button className="text-[#000927] text-base font-normal font-['Barlow'] leading-relaxed hover:text-primary" onClick={() => window.location.href = `/#/courselist/${categoryId}`}>{categoryName??'All Courses'}</button>
+                  <ChevronRight className="h-4 w-4 text-gray-400 mx-2" />
+                  <span className="text-gray-500 text-base font-normal font-['Barlow'] leading-relaxed">{subCategoryName}</span>
+                </>
+              ) : (
+                <span className="text-gray-500 text-base font-normal font-['Barlow'] leading-relaxed">{categoryName??'All Courses'}</span>
+              )}
             </div>
           </div>
 
           {/* Design Category Header */}
           <div className="container mx-auto px-4 py-2">
-            <h1 className="page-title mb-6">{categoryName??'All Courses'}</h1>
+            <h1 className="page-title mb-6">
+              {subCategoryName ? `${categoryName} - ${subCategoryName}` : (categoryName ?? 'All Courses')}
+            </h1>
 
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -358,6 +390,9 @@ export default function CourseList() {
                   </div>
 
                   <FilterContent 
+                    categoryId={categoryId}
+                    selectedCategories={selectedCategories}
+                    setSelectedCategories={setSelectedCategories}
                     selectedRatings={selectedRatings}
                     setSelectedRatings={setSelectedRatings}
                     selectedPrice={selectedPrice}
@@ -484,6 +519,9 @@ function FilterAccordion({ title, children, defaultOpen = true }: FilterAccordio
 
 // Filter Content Component with Accordions
 function FilterContent({ 
+  categoryId,
+  selectedCategories,
+  setSelectedCategories,
   selectedRatings, 
   setSelectedRatings, 
   selectedPrice, 
@@ -493,6 +531,9 @@ function FilterContent({
   selectedTopics, 
   setSelectedTopics 
 }: {
+  categoryId?: string;
+  selectedCategories: string[];
+  setSelectedCategories: (value: string[]) => void;
   selectedRatings: string[];
   setSelectedRatings: (value: string[]) => void;
   selectedPrice: string[];
@@ -505,7 +546,9 @@ function FilterContent({
   // State for expanded sections
   const [showMoreDuration, setShowMoreDuration] = useState(false);
   const [showMoreTopics, setShowMoreTopics] = useState(false);
-    const [additionalTopics, setadditionalTopics] = useState<SubCategory[]>([]);
+  const [showMoreCategories, setShowMoreCategories] = useState(false);
+  const [additionalTopics, setadditionalTopics] = useState<SubCategory[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   
   // Additional items that will show when "Show more" is clicked
   const additionalDurations = [
@@ -514,17 +557,25 @@ function FilterContent({
   ];
 
   useEffect(() => {
+    courseApiService.getPublicCategories().then(data => setCategories(data));
+  }, []);
+
+  useEffect(() => {
     // Simulate fetching additional topics from an API or data source
     const fetchAdditionalTopics = async () => {
       // Replace this with actual data fetching logic if needed 
       courseApiService.getPublicSubCategories().then((data) => {
-            setadditionalTopics(data as any);
-          });
+        let filteredData = data;
+        if (selectedCategories && selectedCategories.length > 0) {
+          filteredData = data.filter(c => selectedCategories.includes(String(c.categoryId)));
+        } else if (categoryId) {
+          filteredData = data.filter(c => c.categoryId === parseInt(categoryId, 10));
         }
+        setadditionalTopics(filteredData as any);
+      });
+    }
     fetchAdditionalTopics();
-  }, []);
-        
-          
+  }, [selectedCategories, categoryId]);
 
 
   // Handle price filter changes
@@ -554,31 +605,52 @@ function FilterContent({
     }
   };
 
+  // Handle category filter changes
+  const handleCategoryChange = (catId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedCategories([catId]); // API currently supports one category, so overwrite
+      setSelectedTopics([]); // Reset subcategories when category changes
+    } else {
+      setSelectedCategories([]);
+      setSelectedTopics([]);
+    }
+  };
+
   return (
     <div className="space-y-2">
       
-
-      <FilterAccordion title="Price">
-        <div className="space-y-3 font-bold">
-          <div className="flex items-center">
-            <Checkbox 
-              id="free" 
-              className="mr-3" 
-              checked={selectedPrice.includes('free')}
-              onCheckedChange={(checked) => handlePriceChange('free', checked as boolean)}
-            />
-            <label htmlFor="free">Free</label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="paid" 
-              className="mr-3" 
-              checked={selectedPrice.includes('paid')}
-              onCheckedChange={(checked) => handlePriceChange('paid', checked as boolean)}
-            />
-            <label htmlFor="paid">Paid</label>
-          </div>
+      {/* Category Filter */}
+      <FilterAccordion title="Category">
+        <div className="space-y-3 font-bold max-h-64 overflow-y-auto">
+          {categories.length > 0 && (
+            <>
+              {categories.map((cat: any) => {
+                if (!showMoreCategories && categories.indexOf(cat) > 0) {
+                  return null;
+                }
+                return (
+                  <div key={cat.id} className="flex items-center">
+                    <Checkbox 
+                      id={`cat-${cat.id}`} 
+                      className="mr-3" 
+                      checked={selectedCategories.includes(String(cat.id))}
+                      onCheckedChange={(checked) => handleCategoryChange(String(cat.id), checked as boolean)}
+                    />
+                    <label htmlFor={`cat-${cat.id}`}>{cat.title}</label>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
+        {categories.length > 0 && (
+          <button 
+            className="text-purple-600 mt-3 font-medium focus:outline-none"
+            onClick={() => setShowMoreCategories(!showMoreCategories)}
+          >
+            {showMoreCategories ? "Show less" : "Show more"}
+          </button>
+        )}
       </FilterAccordion>
 
       {/* Topic Filter */}
@@ -614,6 +686,29 @@ function FilterContent({
             {showMoreTopics ? "Show less" : "Show more"}
           </button>
         )}
+      </FilterAccordion>
+
+      <FilterAccordion title="Price">
+        <div className="space-y-3 font-bold">
+          <div className="flex items-center">
+            <Checkbox 
+              id="free" 
+              className="mr-3" 
+              checked={selectedPrice.includes('free')}
+              onCheckedChange={(checked) => handlePriceChange('free', checked as boolean)}
+            />
+            <label htmlFor="free">Free</label>
+          </div>
+          <div className="flex items-center">
+            <Checkbox 
+              id="paid" 
+              className="mr-3" 
+              checked={selectedPrice.includes('paid')}
+              onCheckedChange={(checked) => handlePriceChange('paid', checked as boolean)}
+            />
+            <label htmlFor="paid">Paid</label>
+          </div>
+        </div>
       </FilterAccordion>
 
       {/* Video Duration Filter */}
@@ -793,7 +888,7 @@ export function CourseCard({ course, progress = false }: {
   progress?: boolean 
 }) {
   // Calculate student count - handle both interfaces
-  const studentCount = (course as any).enrolments || (course as any).students || 0;
+  const studentCount = (course as any).enrolments || (course as any).students || (course as any).enrollment || (course as any).EnrollmentCount || 0;
   
   // Calculate course duration - handle both interfaces
   const courseDuration = (course as any).weeks || (course as any).duration || 0;

@@ -309,6 +309,7 @@ export interface SearchCourseResponse {
   subCategory: string | null;
   thumbnailUrl: string | null;
   promoVideoUrl: string | null;
+  enrolments?: number;
 }
 
 class CourseApiService {
