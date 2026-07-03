@@ -325,6 +325,39 @@ export default function CourseDetailsPage() {
   const lastUpdateTimeRef = useRef(0); // Separate ref for tracking last update time
   const lastPayoutWatchTimeRef = useRef<number>(0); // Track last recorded watch time for payout
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [resolution, setResolution] = useState("Auto");
+
+  const applyResolutionToHls = () => {
+    if (playerRef.current) {
+      const hls = playerRef.current.getInternalPlayer('hls');
+      if (hls && hls.levels && hls.levels.length > 0) {
+        if (resolution === 'Auto') {
+          hls.currentLevel = -1;
+        } else {
+          const targetHeight = parseInt(resolution);
+          if (!isNaN(targetHeight)) {
+            let closest = -1;
+            let minDiff = Infinity;
+            hls.levels.forEach((level: any, index: number) => {
+               const diff = Math.abs(level.height - targetHeight);
+               if (diff < minDiff) {
+                 minDiff = diff;
+                 closest = index;
+               }
+            });
+            if (closest !== -1) {
+              hls.currentLevel = closest;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    applyResolutionToHls();
+  }, [resolution]);
+
 
   // Use a ref to track if progress is being loaded to prevent infinite loops
   const progressLoadingRef = useRef(false);
@@ -1323,7 +1356,21 @@ export default function CourseDetailsPage() {
   });
 
   const renderVideoPlayer = (module: any) => {
-    const videoUrl = convertYouTubeUrl(module.contentUrl || module.contentFiles?.[0]?.url || "");
+    let videoUrl = convertYouTubeUrl(module.contentUrl || module.contentFiles?.[0]?.url || "");
+    
+    // Try to find a specific file for the selected resolution
+    if (module.contentFiles && module.contentFiles.length > 0 && resolution !== "Auto") {
+      const resFile = module.contentFiles.find((f: any) => 
+        (f.name && f.name.toLowerCase().includes(resolution.toLowerCase())) || 
+        (f.url && f.url.toLowerCase().includes(resolution.toLowerCase())) ||
+        (f.quality && f.quality === resolution)
+      );
+      if (resFile) {
+        videoUrl = convertYouTubeUrl(resFile.url);
+      }
+    }
+
+
     console.log('Video Player Debug:', {
       module: module,
       contentUrl: module.contentUrl,
@@ -1339,6 +1386,7 @@ export default function CourseDetailsPage() {
         <div ref={playerContainerRef}
           className={`relative h-[450px]`}>
           <ReactPlayer
+            key={videoUrl + (videoUrl.includes('youtube') || videoUrl.includes('youtu.be') ? resolution : '')}
             ref={playerRef}
             url={videoUrl}
             playing={isPlaying}
@@ -1369,6 +1417,13 @@ export default function CourseDetailsPage() {
             onPause={handlePause}
             onSeek={(seconds) => handleSeek(seconds)}
             onEnded={handleEnded}
+            onReady={() => {
+              applyResolutionToHls();
+              if (currentTime > 0 && playerRef.current && (videoUrl.includes('youtube') || videoUrl.includes('youtu.be'))) {
+                // Seek to the saved time when remounting due to resolution change (mostly for YouTube)
+                playerRef.current.seekTo(currentTime, 'seconds');
+              }
+            }}
             onError={(error) => {
               console.error('ReactPlayer Error:', error);
               console.error('Video URL that failed:', videoUrl);
@@ -1391,7 +1446,8 @@ export default function CourseDetailsPage() {
                 playerVars: {
                   modestbranding: 1,
                   rel: 0,
-                  showinfo: 0
+                  showinfo: 0,
+                  vq: resolution === '1080p' ? 'hd1080' : resolution === '720p' ? 'hd720' : resolution === '480p' ? 'large' : resolution === '360p' ? 'medium' : undefined
                 }
               },
               file: {
@@ -1494,10 +1550,17 @@ export default function CourseDetailsPage() {
                   <option value="0.25">0.25x</option>
                   <option value="0.5">0.5x</option>
                   <option value="0.75">0.75x</option>
-                  <option value="1" selected>1x</option>
+                  <option value="1">1x</option>
                   <option value="1.25">1.25x</option>
                   <option value="1.5">1.5x</option>
                   <option value="2">2x</option>
+                </select>
+                <select value={resolution} onChange={(e) => setResolution(e.target.value)} className="bg-gray-700 text-white rounded px-2 py-1 ml-2">
+                  <option value="Auto">Auto</option>
+                  <option value="1080p">1080p</option>
+                  <option value="720p">720p</option>
+                  <option value="480p">480p</option>
+                  <option value="360p">360p</option>
                 </select>
                 {/* <span>{playbackRate}x</span> */}
               </div>
