@@ -16,6 +16,7 @@ interface CustomUser {
   address?: string;
   AccessToken?: string;
   ProfileImage?: string;
+  allowBecomingInstructor?: boolean;
 }
 
 interface AuthContextType {
@@ -57,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           Role: userData.Role || userData.role || 0,
           AccessToken: userData.AccessToken,
           ProfileImage: userData.ProfileImage || userData.profileImage,
+          allowBecomingInstructor: userData.AllowBecomingInstructor || false,
         };
 
         setUser(customUser);

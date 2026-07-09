@@ -200,7 +200,7 @@ function Header({ onMenuClick }: HeaderProps) {
         <nav className="hidden md:flex items-center space-x-6 text-base font-semibold font-['Barlow'] capitalize leading-relaxed">
           <MainNavigationMenu />
           <a href="#/pricing" className="font-medium text-[#000927] hover:text-blue-600">Pricing Plan</a>
-          {(isAuthenticated && user?.Role !== 5) && (
+          {(isAuthenticated && user?.Role !== 5 && user?.allowBecomingInstructor) && (
             <button onClick={handleTeachWithUsClick} className="font-medium text-[#000927] hover:text-blue-600 bg-transparent border-none cursor-pointer">Teach With Us</button>
           )}
         </nav>
@@ -316,7 +316,7 @@ function Header({ onMenuClick }: HeaderProps) {
               </div>
             )}
             <div className="flex items-center space-x-2">
-              {(user?.Role === 5) && <Button
+              {(user?.Role === 5 && user?.allowBecomingInstructor) && <Button
                 variant="outline"
                 className="hidden border-primary text-primary rounded-none md:block px-4 py-2 text-sm font-medium hover:bg-blue-50"
                 onClick={() => handleTeachWithUsClick()}
