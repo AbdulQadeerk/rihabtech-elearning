@@ -16,7 +16,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "../../../../compo
 import * as XLSX from 'xlsx';
 
 import { getCourseDraft } from "../../../../fakeAPI/course";
-import { uploadToCloudinary, deleteFromCloudinary } from "../../../../lib/bunny";
+import { uploadToCloudinary, deleteFromCloudinary, getBunnyVideoLength } from "../../../../lib/bunny";
 import { courseApiService, UpdateCourseMessageResponse } from "../../../../utils/courseApiService";
 import { useAuth } from "../../../../context/AuthContext";
 import { useCourseData } from "../../../../hooks/useCourseData";
@@ -1889,6 +1889,65 @@ export function CourseCarriculam({ onSubmit }: any) {
     }, 2000), // 2 second debounce for global state updates
     [loading, courseData, storeCurriculumData]
   );
+
+  // Backfill missing video durations from Bunny Stream for already-saved lectures
+  useEffect(() => {
+    if (loading || !formik.values.sections?.length) return;
+
+    const extractBunnyVideoId = (url: string): string | null => {
+      if (!url) return null;
+      const match = url.match(/\/([a-f0-9-]{36})\//i);
+      return match ? match[1] : null;
+    };
+
+    let cancelled = false;
+
+    const backfillMissingDurations = async () => {
+      const sections = formik.values.sections;
+      const updatedSections = sections.map(section => ({
+        ...section,
+        items: section.items ? [...section.items] : [],
+      }));
+      let hasUpdates = false;
+
+      for (const section of updatedSections) {
+        for (let itemIdx = 0; itemIdx < (section.items?.length || 0); itemIdx++) {
+          const item = section.items[itemIdx];
+          if (item.type !== 'lecture' || item.contentType !== 'video') continue;
+
+          const lecture = item as LectureItem;
+          const currentDuration = lecture.duration || lecture.contentFiles?.[0]?.duration || 0;
+          if (currentDuration > 0) continue;
+
+          const videoUrl = lecture.contentUrl || lecture.contentFiles?.[0]?.url || '';
+          const videoId = extractBunnyVideoId(videoUrl);
+          if (!videoId) continue;
+
+          const bunnyLength = await getBunnyVideoLength(videoId);
+          if (cancelled || bunnyLength <= 0) continue;
+
+          lecture.duration = bunnyLength;
+          if (lecture.contentFiles && lecture.contentFiles.length > 0) {
+            lecture.contentFiles[0] = {
+              ...lecture.contentFiles[0],
+              duration: bunnyLength,
+            };
+          }
+          hasUpdates = true;
+        }
+      }
+
+      if (!cancelled && hasUpdates) {
+        formik.setFieldValue('sections', updatedSections);
+      }
+    };
+
+    backfillMissingDurations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, formInitialValues, courseData?.id]);
 
   useEffect(() => {
     debouncedStoreData(formik.values);
