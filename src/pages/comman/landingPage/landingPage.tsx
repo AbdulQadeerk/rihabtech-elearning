@@ -171,7 +171,7 @@ const EducationLandingPage: React.FC = () => {
             </div>
             <div className="md:w-1/2">
               <img 
-                src="/api/placeholder/500/400" 
+                src="Images/Banners/col-md-6.png" 
                 alt="Student with books" 
                 className="rounded-xl"
               />
@@ -180,40 +180,7 @@ const EducationLandingPage: React.FC = () => {
         </div>
       </section>
       
-      {/* Student Reviews */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">What Our Students Say</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[1, 2, 3].map((_, index) => (
-              <div key={index} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100">
-                <div className="flex items-center text-yellow-500 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-6">
-                  "The courses were comprehensive and well-structured. I've learned skills that I'm now using daily in my job. The instructors were knowledgeable and supportive."
-                </p>
-                <div className="flex items-center">
-                  <div className="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 mr-4">
-                    <img 
-                      src="/api/placeholder/48/48" 
-                      alt="Student" 
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Alex Thompson</h4>
-                    <p className="text-sm text-gray-500">Web Developer</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Student Reviews section removed — testimonials are loaded from API on the main landing page */}
       
       {/* Certification Section */}
       <section className="py-16 bg-gray-50">

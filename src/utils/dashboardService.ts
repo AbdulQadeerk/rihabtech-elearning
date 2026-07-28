@@ -122,8 +122,15 @@ class DashboardService {
       };
     } catch (error) {
       console.error('Error getting dashboard stats:', error);
-      // Fallback to mock data on error
-      return this.getMockDashboardStats();
+      return {
+        totalRevenue: 0,
+        totalEnrollments: 0,
+        totalStudents: 0,
+        totalCourses: 0,
+        totalWatchtime: 0,
+        currentMonthRevenue: 0,
+        currentMonthEnrollments: 0
+      };
     }
   }
 
@@ -180,8 +187,6 @@ class DashboardService {
   // Get reviews data
   async getReviewsData(instructorId: string): Promise<ReviewData[]> {
     try {
-      // Try to fetch from a reviews collection if it exists
-      // For now, we'll simulate dynamic data based on course enrollments
       const coursesQuery = query(
         collection(db, this.COURSES_COLLECTION),
         where('instructorId', '==', instructorId)
@@ -189,124 +194,15 @@ class DashboardService {
       const coursesSnapshot = await getDocs(coursesQuery);
 
       if (coursesSnapshot.empty) {
-        // Return mock data if no courses found
-        return this.getMockReviewsData();
+        return [];
       }
 
-      // Generate dynamic review data based on course performance
-      const reviews: ReviewData[] = [];
-      const courseIds = coursesSnapshot.docs.map(doc => doc.id);
-
-      // Simulate reviews for each course
-      courseIds.forEach((courseId, index) => {
-        const courseDoc = coursesSnapshot.docs[index];
-        const courseData = courseDoc.data() as any;
-
-        // Generate 1-3 reviews per course
-        const reviewCount = Math.floor(Math.random() * 3) + 1;
-
-        for (let i = 0; i < reviewCount; i++) {
-          const studentNames = ['Mehul Shah', 'Rajesh Kumar', 'Priya Singh', 'Amit Patel', 'Neha Sharma', 'Vikram Singh'];
-          const studentRoles = ['Student', 'Developer', 'Student', 'Student', 'Student', 'Student'];
-          const ratings = [4, 5, 4, 5, 4, 5];
-          const reviewTexts = [
-            'Excellent course with practical examples. Highly recommended for beginners.',
-            'Great content and clear explanations. The instructor is very knowledgeable.',
-            'Very comprehensive course covering all important concepts.',
-            'Good pace and easy to follow. Learned a lot from this course.',
-            'Well-structured content with real-world examples.',
-            'Fantastic course! The instructor explains complex topics very clearly.'
-          ];
-
-          const randomIndex = Math.floor(Math.random() * studentNames.length);
-          const reviewDate = new Date();
-          reviewDate.setDate(reviewDate.getDate() - Math.floor(Math.random() * 30)); // Random date within last 30 days
-
-          reviews.push({
-            id: `${courseId}-review-${i}`,
-            studentName: studentNames[randomIndex],
-            studentRole: studentRoles[randomIndex],
-            rating: ratings[randomIndex],
-            reviewText: reviewTexts[randomIndex],
-            courseId: courseId,
-            courseTitle: courseData.title || courseData.courseTitle || 'Unknown Course',
-            reviewDate: reviewDate,
-            isReplied: Math.random() > 0.7, // 30% chance of being replied to
-            replyText: Math.random() > 0.7 ? 'Thank you for your feedback! We are glad you found the course helpful.' : undefined,
-            replyDate: Math.random() > 0.7 ? new Date(reviewDate.getTime() + 24 * 60 * 60 * 1000) : undefined
-          });
-        }
-      });
-
-      // Sort by review date (newest first)
-      return reviews.sort((a, b) => b.reviewDate.getTime() - a.reviewDate.getTime());
-
+      // Real reviews are loaded via reviewApiService on the reviews page
+      return [];
     } catch (error) {
       console.error('Error getting reviews data:', error);
-      // Fallback to mock data
-      return this.getMockReviewsData();
+      return [];
     }
-  }
-
-  // Mock reviews data for fallback
-  private getMockReviewsData(): ReviewData[] {
-    return [
-      {
-        id: '1',
-        studentName: 'Mehul Shah',
-        studentRole: 'Student',
-        rating: 5,
-        reviewText: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla a eleifend elit. Orci varius natoque penatibus',
-        courseId: 'course-1',
-        courseTitle: 'Web Development Fundamentals',
-        reviewDate: new Date('2025-01-15'),
-        isReplied: false
-      },
-      {
-        id: '2',
-        studentName: 'Rajesh Kumar',
-        studentRole: 'Student',
-        rating: 4,
-        reviewText: 'Excellent course with practical examples. Highly recommended for beginners.',
-        courseId: 'course-2',
-        courseTitle: 'React.js Masterclass',
-        reviewDate: new Date('2025-01-10'),
-        isReplied: true,
-        replyText: 'Thank you for your feedback! We are glad you found the course helpful.',
-        replyDate: new Date('2025-01-11')
-      },
-      {
-        id: '3',
-        studentName: 'Priya Singh',
-        studentRole: 'Student',
-        rating: 5,
-        reviewText: 'Great content and clear explanations. The instructor is very knowledgeable.',
-        courseId: 'course-3',
-        courseTitle: 'Node.js Backend Development',
-        reviewDate: new Date('2025-01-08'),
-        isReplied: false
-      }
-    ];
-  }
-
-  // Mock engagement data for fallback
-  private getMockEngagementData(): EngagementData {
-    return {
-      totalMinutesWatched: 999999,
-      activeLearners: 99999,
-      averageCompletionRate: 75,
-      monthlyStats: [
-        { month: '2025-01', minutesWatched: 8000, enrollments: 15, revenue: 8000 },
-        { month: '2025-02', minutesWatched: 12000, enrollments: 22, revenue: 12000 },
-        { month: '2025-03', minutesWatched: 9500, enrollments: 18, revenue: 9500 }
-      ],
-      coursePerformance: [
-        { courseId: '1', courseTitle: 'Web Development', viewed: 45, dropped: 5, amountConsumed: 85 },
-        { courseId: '2', courseTitle: 'React.js', viewed: 38, dropped: 3, amountConsumed: 92 },
-        { courseId: '3', courseTitle: 'Node.js', viewed: 32, dropped: 4, amountConsumed: 78 }
-      ],
-      deviceStats: { mobile: 45, tablet: 25, laptop: 30 }
-    };
   }
 
   // Get engagement data
@@ -326,67 +222,14 @@ class DashboardService {
       const monthlyStats = new Map<string, { month: string; minutesWatched: number; enrollments: number; revenue: number }>();
       const coursePerformance = new Map<string, { courseId: string; courseTitle: string; viewed: number; dropped: number; amountConsumed: number }>();
 
-      // Generate realistic monthly data if no real data exists
       if (watchTimeSnapshot.empty) {
-        const months = ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06'];
-        months.forEach((month, index) => {
-          // Generate varied, realistic data
-          const baseMinutes = 8000 + (Math.random() * 4000 - 2000); // 6000-10000 range
-          const minutesWatched = Math.round(baseMinutes + (index * 500)); // Gradual increase
-          const enrollments = Math.round(15 + (Math.random() * 10 - 5)); // 10-20 range
-          const revenue = Math.round(minutesWatched * 0.8); // Realistic revenue calculation
-
-          monthlyStats.set(month, { month, minutesWatched, enrollments, revenue });
-          totalMinutesWatched += minutesWatched;
-        });
-
-        // Generate realistic course performance data
-        const courseTitles = [
-          'Web Development Fundamentals',
-          'React.js Masterclass',
-          'Node.js Backend Development',
-          'Python for Beginners',
-          'Data Science Essentials'
-        ];
-
-        courseTitles.forEach((title, index) => {
-          const viewed = Math.round(40 + (Math.random() * 30 - 15)); // 25-55 range
-          const dropped = Math.round(5 + (Math.random() * 10 - 5)); // 0-10 range
-          const amountConsumed = Math.round(60 + (Math.random() * 40 - 20)); // 40-80 range
-
-          coursePerformance.set(`course-${index + 1}`, {
-            courseId: `course-${index + 1}`,
-            courseTitle: title,
-            viewed,
-            dropped,
-            amountConsumed
-          });
-        });
-
-        // Generate realistic device stats
-        const deviceStats = {
-          mobile: Math.round(35 + (Math.random() * 20 - 10)), // 25-45%
-          tablet: Math.round(20 + (Math.random() * 15 - 7)),  // 13-27%
-          laptop: 0 // Will be calculated
-        };
-
-        // Normalize to 100%
-        const total = deviceStats.mobile + deviceStats.tablet;
-        deviceStats.mobile = Math.round((deviceStats.mobile / total) * 100);
-        deviceStats.tablet = Math.round((deviceStats.tablet / total) * 100);
-        deviceStats.laptop = 100 - deviceStats.mobile - deviceStats.tablet;
-
-        // Calculate realistic active learners and completion rate
-        const activeLearners = Math.round(totalMinutesWatched / 100); // Realistic ratio
-        const averageCompletionRate = Math.round(65 + (Math.random() * 20 - 10)); // 55-75% range
-
         return {
-          totalMinutesWatched,
-          activeLearners,
-          averageCompletionRate,
-          monthlyStats: Array.from(monthlyStats.values()).sort((a, b) => a.month.localeCompare(b.month)),
-          coursePerformance: Array.from(coursePerformance.values()),
-          deviceStats
+          totalMinutesWatched: 0,
+          activeLearners: 0,
+          averageCompletionRate: 0,
+          monthlyStats: [],
+          coursePerformance: [],
+          deviceStats: { mobile: 0, tablet: 0, laptop: 0 }
         };
       }
 
@@ -468,18 +311,7 @@ class DashboardService {
 
       const averageCompletionRate = courseCount > 0 ? totalCompletionRate / courseCount : 0;
 
-      // Generate device stats (simulated based on course performance)
-      const deviceStats = {
-        mobile: Math.floor(Math.random() * 40) + 30, // 30-70%
-        tablet: Math.floor(Math.random() * 20) + 10,  // 10-30%
-        laptop: Math.floor(Math.random() * 40) + 20   // 20-60%
-      };
-
-      // Normalize device stats to 100%
-      const total = deviceStats.mobile + deviceStats.tablet + deviceStats.laptop;
-      deviceStats.mobile = Math.round((deviceStats.mobile / total) * 100);
-      deviceStats.tablet = Math.round((deviceStats.tablet / total) * 100);
-      deviceStats.laptop = 100 - deviceStats.mobile - deviceStats.tablet;
+      const deviceStats = { mobile: 0, tablet: 0, laptop: 0 };
 
       return {
         totalMinutesWatched,
@@ -492,8 +324,14 @@ class DashboardService {
 
     } catch (error) {
       console.error('Error getting engagement data:', error);
-      // Fallback to mock data
-      return this.getMockEngagementData();
+      return {
+        totalMinutesWatched: 0,
+        activeLearners: 0,
+        averageCompletionRate: 0,
+        monthlyStats: [],
+        coursePerformance: [],
+        deviceStats: { mobile: 0, tablet: 0, laptop: 0 }
+      };
     }
   }
 
@@ -581,24 +419,9 @@ class DashboardService {
 
     } catch (error) {
       console.error('Error getting course categories:', error);
-      return ['Development', 'Design', 'Business'];
+      return [];
     }
   }
-
-
-  // Mock data for development/testing
-  getMockDashboardStats(): DashboardStats {
-    return {
-      totalRevenue: 9999999,
-      totalEnrollments: 9999999,
-      totalStudents: 9999999,
-      totalCourses: 3,
-      totalWatchtime: 9999999,
-      currentMonthRevenue: 40000,
-      currentMonthEnrollments: 999999
-    };
-  }
-
 
 }
 

@@ -384,101 +384,13 @@ class ChatService {
       };
     } catch (error) {
       console.error('Error getting chat stats:', error);
-      return this.getMockChatStats();
+      return {
+        totalConversations: 0,
+        unreadMessages: 0,
+        activeChats: 0,
+        totalMessages: 0
+      };
     }
-  }
-
-  // Mock data methods
-  private getMockConversations(instructorId: string): ChatConversation[] {
-    return [
-      {
-        id: '1',
-        participants: [instructorId, 'student1'],
-        participantNames: ['You', 'John Smith'],
-        lastMessage: 'Thank you for the clarification on the assignment!',
-        lastMessageTime: new Date('2025-01-23T10:30:00'),
-        unreadCount: 0,
-        isActive: true,
-        createdAt: new Date('2025-01-20'),
-        updatedAt: new Date('2025-01-23T10:30:00'),
-        courseId: 'course1',
-        courseName: 'React Fundamentals'
-      },
-      {
-        id: '2',
-        participants: [instructorId, 'student2'],
-        participantNames: ['You', 'Sarah Johnson'],
-        lastMessage: 'When will the next module be available?',
-        lastMessageTime: new Date('2025-01-23T09:15:00'),
-        unreadCount: 1,
-        isActive: true,
-        createdAt: new Date('2025-01-18'),
-        updatedAt: new Date('2025-01-23T09:15:00'),
-        courseId: 'course1',
-        courseName: 'React Fundamentals'
-      },
-      {
-        id: '3',
-        participants: [instructorId, 'student3'],
-        participantNames: ['You', 'Mike Davis'],
-        lastMessage: 'I completed the project. Can you review it?',
-        lastMessageTime: new Date('2025-01-22T16:45:00'),
-        unreadCount: 0,
-        isActive: true,
-        createdAt: new Date('2025-01-15'),
-        updatedAt: new Date('2025-01-22T16:45:00'),
-        courseId: 'course2',
-        courseName: 'Advanced JavaScript'
-      },
-      {
-        id: '4',
-        participants: [instructorId, 'student4'],
-        participantNames: ['You', 'Emily Wilson'],
-        lastMessage: 'The course material is excellent!',
-        lastMessageTime: new Date('2025-01-21T14:20:00'),
-        unreadCount: 0,
-        isActive: false,
-        createdAt: new Date('2025-01-10'),
-        updatedAt: new Date('2025-01-21T14:20:00'),
-        courseId: 'course2',
-        courseName: 'Advanced JavaScript'
-      },
-      {
-        id: '5',
-        participants: [instructorId, 'student5'],
-        participantNames: ['You', 'Alex Chen'],
-        lastMessage: 'Can you help me with the authentication setup?',
-        lastMessageTime: new Date('2025-01-24T11:20:00'),
-        unreadCount: 2,
-        isActive: true,
-        createdAt: new Date('2025-01-22'),
-        updatedAt: new Date('2025-01-24T11:20:00'),
-        courseId: 'course3',
-        courseName: 'Node.js Backend Development'
-      },
-      {
-        id: '6',
-        participants: [instructorId, 'student6'],
-        participantNames: ['You', 'Lisa Rodriguez'],
-        lastMessage: 'The project deadline is approaching. Any tips?',
-        lastMessageTime: new Date('2025-01-24T08:45:00'),
-        unreadCount: 0,
-        isActive: true,
-        createdAt: new Date('2025-01-19'),
-        updatedAt: new Date('2025-01-24T08:45:00'),
-        courseId: 'course1',
-        courseName: 'React Fundamentals'
-      }
-    ];
-  }
-
-  private getMockChatStats(): ChatStats {
-    return {
-      totalConversations: 4,
-      unreadMessages: 1,
-      activeChats: 3,
-      totalMessages: 20
-    };
   }
 }
 

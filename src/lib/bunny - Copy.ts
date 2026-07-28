@@ -37,29 +37,37 @@ export const getVideoDuration = async (file: File): Promise<number> => {
     const video = document.createElement('video');
     video.preload = 'metadata';
 
+    // Create object URL
+    const objectUrl = URL.createObjectURL(file);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.remove();
+    };
+
     video.onloadedmetadata = () => {
       const duration = video.duration || 0;
       console.log('Video duration detected from file:', duration);
-      video.remove();
+      cleanup();
       resolve(duration);
     };
 
     video.onerror = (e) => {
       console.log('Failed to get video duration from file:', e);
-      video.remove();
+      cleanup();
       resolve(0);
     };
 
-    video.src = URL.createObjectURL(file);
+    video.src = objectUrl;
 
-    // Set a timeout in case the video doesn't load
+    // Set a timeout in case the video doesn't load (increased for bulk uploads)
     setTimeout(() => {
-      if (video.duration === undefined || isNaN(video.duration)) {
+      if (video.duration === undefined || isNaN(video.duration) || video.duration === 0) {
         console.log('Video duration timeout, using 0');
-        video.remove();
+        cleanup();
         resolve(0);
       }
-    }, 5000);
+    }, 15000); // Increased timeout to 15s to handle concurrent IO limits
   });
 };
 

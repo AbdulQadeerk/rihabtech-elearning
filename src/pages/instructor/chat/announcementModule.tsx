@@ -25,29 +25,9 @@ export type Course = {
   title: string;
 };
 
-// Static mock data
-const MOCK_COURSES: Course[] = [
-  { id: 'all-courses', title: 'All Courses' },
-  { id: 'course-1', title: 'React Fundamentals' },
-  { id: 'course-2', title: 'Advanced TypeScript' },
-  { id: 'course-3', title: 'Node.js for Beginners' },
-];
-
-const MOCK_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: 'a1',
-    title: 'Welcome to the course!',
-    message: 'Hello learners — welcome. Please check the syllabus and introduce yourself in the forum.',
-    courseId: 'course-1',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'a2',
-    title: 'Maintenance downtime',
-    message: 'Platform will be under maintenance on Saturday 10 PM - 11 PM.',
-    courseId: 'all',
-    createdAt: new Date().toISOString(),
-  }
+// Default course list when API is unavailable
+const DEFAULT_COURSES: Course[] = [
+  { id: 'all', title: 'All Courses' },
 ];
 
 // Helpers
@@ -93,7 +73,7 @@ export default function AnnouncementModule() {
       } catch (err) {
         console.error('Error loading courses:', err);
         // Fallback to mock courses
-        setCourses(MOCK_COURSES);
+        setCourses(DEFAULT_COURSES);
       } finally {
         setLoadingCourses(false);
       }
@@ -131,7 +111,7 @@ export default function AnnouncementModule() {
         console.error('Error loading announcements:', err);
         setError('Failed to load announcements');
         // Fallback to mock data
-        setAnnouncements(MOCK_ANNOUNCEMENTS);
+        setAnnouncements([]);
       } finally {
         setLoading(false);
       }

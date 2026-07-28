@@ -12,6 +12,7 @@ import courseApiService, { Category, CourseGetAllResponse, SearchCourseResponse 
 import { toast } from 'sonner';
 import { htmlToText } from "../../lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
+import Courses from "../comman/landingPage/courses";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -217,10 +218,8 @@ export default function HomePage() {
       toast.success('Data refreshed successfully!');
     } catch (error) {
       console.error('Error refreshing data:', error);
-      // setEnrolledCourses(getMockEnrolledCourses());
-      // setRecommendedCourses(getMockRecommendedCourses());
       setError('Failed to refresh data');
-      toast.error('Failed to refresh data. Using sample data instead.');
+      toast.error('Failed to refresh data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -458,18 +457,14 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Category Filters Section */}
+      <Courses />
+
       {/* My Learnings Section */}
       <section className="py-12">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center mb-6">
             <h2 className="section-title">My Learnings</h2>
-            <div className="flex items-center gap-2">
-              {error && (
-                <span className="text-sm text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                  Using sample data
-                </span>
-              )}
-            </div>
           </div>
 
           {loading ? (
@@ -535,11 +530,6 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center mb-6">
             <h2 className="section-title">Courses You May Like</h2>
-            {error && (
-              <span className="text-sm text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                Using sample data
-              </span>
-            )}
           </div>
 
           {loading ? (

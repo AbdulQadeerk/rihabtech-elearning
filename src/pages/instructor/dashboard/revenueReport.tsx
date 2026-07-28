@@ -41,11 +41,12 @@ const RevenueReport: React.FC = () => {
   const [selectedCourse, setSelectedCourse] = useState('all');
   const [viewMode, setViewMode] = useState<'table' | 'chart' | 'analytics'>('table');
 
-  const instructorId = user?.UserName || user?.email || 'abdulquader152@gmail.com';
+  const instructorId = user?.UserName || user?.email;
   console.log('Current user:', user);
   console.log('Using instructorId:', instructorId);
 
   const loadRevenueData = useCallback(async () => {
+    if (!instructorId) return;
     try {
       setLoading(true);
       console.log('Loading revenue data for instructor:', instructorId);

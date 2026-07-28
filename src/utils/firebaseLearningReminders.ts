@@ -282,68 +282,11 @@ class FirebaseLearningRemindersService {
         });
       }
 
-      // If still no courses, add some sample courses
-      if (courses.length === 0) {
-        console.log('Firebase Learning Reminders Service: No courses found, using sample courses');
-        courses = [
-          {
-            id: 'sample-1',
-            title: 'The Python Developer Essentials Immersive Bootcamp',
-            instructorId: userId,
-            thumbnailUrl: 'https://via.placeholder.com/300x200?text=Python+Course'
-          },
-          {
-            id: 'sample-2',
-            title: 'React JS Frontend Web Development for Beginners',
-            instructorId: userId,
-            thumbnailUrl: 'https://via.placeholder.com/300x200?text=React+Course'
-          },
-          {
-            id: 'sample-3',
-            title: 'Introduction To Python Programming',
-            instructorId: userId,
-            thumbnailUrl: 'https://via.placeholder.com/300x200?text=Python+Intro'
-          },
-          {
-            id: 'sample-4',
-            title: 'Advanced JavaScript and ES6+',
-            instructorId: userId,
-            thumbnailUrl: 'https://via.placeholder.com/300x200?text=JavaScript+Advanced'
-          },
-          {
-            id: 'sample-5',
-            title: 'Full-Stack Web Development with Node.js',
-            instructorId: userId,
-            thumbnailUrl: 'https://via.placeholder.com/300x200?text=Full+Stack'
-          }
-        ];
-      }
-
-      console.log('Firebase Learning Reminders Service: Returning courses:', courses);
+      console.log('Firebase Learning Reminders Service: Returning courses:', courses.length);
       return courses;
     } catch (error) {
       console.error('Error fetching available courses:', error);
-      // Return sample courses on error to prevent UI breaking
-      return [
-        {
-          id: 'sample-1',
-          title: 'The Python Developer Essentials Immersive Bootcamp',
-          instructorId: userId,
-          thumbnailUrl: 'https://via.placeholder.com/300x200?text=Python+Course'
-        },
-        {
-          id: 'sample-2',
-          title: 'React JS Frontend Web Development for Beginners',
-          instructorId: userId,
-          thumbnailUrl: 'https://via.placeholder.com/300x200?text=React+Course'
-        },
-        {
-          id: 'sample-3',
-          title: 'Introduction To Python Programming',
-          instructorId: userId,
-          thumbnailUrl: 'https://via.placeholder.com/300x200?text=Python+Intro'
-        }
-      ];
+      return [];
     }
   }
 

@@ -34,7 +34,7 @@ export const CourseWiseReports = () =>{
     const [loading, setLoading] = useState(false);
     const [selectedCourseForAnalytics, setSelectedCourseForAnalytics] = useState<string>("all");
     
-    const instructorId = user?.UserName || user?.email || 'abdulquader152@gmail.com';
+    const instructorId = user?.UserName || user?.email;
     
     // Load course analytics data
     useEffect(() => {
@@ -44,6 +44,7 @@ export const CourseWiseReports = () =>{
     }, [activeTab, selectedCourseForAnalytics, instructorId]);
     
     const loadCourseAnalytics = async () => {
+        if (!instructorId) return;
         try {
             setLoading(true);
             console.log('Loading course analytics for instructor:', instructorId);
@@ -66,16 +67,10 @@ export const CourseWiseReports = () =>{
                 setRevenueList(list);
                 
             } catch (firebaseError) {
-                console.warn('Firebase data not available, using mock data:', firebaseError);
-                
-                // Fallback to mock data
-                const mockAnalytics = courseAnalyticsService.getMockCourseAnalytics();
-                const mockBreakdown = courseAnalyticsService.getMockRevenueBreakdown();
-                const mockList = courseAnalyticsService.getMockRevenueList();
-                
-                setCourseAnalytics(mockAnalytics);
-                setRevenueBreakdown(mockBreakdown);
-                setRevenueList(mockList);
+                console.warn('Firebase data not available:', firebaseError);
+                setCourseAnalytics([]);
+                setRevenueBreakdown([]);
+                setRevenueList([]);
             }
         } catch (error) {
             console.error('Error loading course analytics:', error);

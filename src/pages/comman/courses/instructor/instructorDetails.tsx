@@ -407,7 +407,7 @@ export default function InstructorDetailsPage() {
           </div>
         </div>
       </div>
-      <InstructorCourses />
+      <InstructorCourses instructorId={instructor?.id} />
     </div>
   );
 }

@@ -153,17 +153,6 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
         });
       }
 
-      // If still no videos, add a sample video for testing
-      if (videos.length === 0) {
-        videos.push({
-          id: 'sample-video',
-          title: 'Sample Lecture',
-          duration: '01:30',
-          videoUrl: '/courses/video2 - Trim.mp4',
-          description: 'This is a sample video for demonstration purposes'
-        });
-      }
-
       console.log('Final preview videos array:', videos);
       console.log('Total promotional videos found:', videos.length);
       setPreviewVideos(videos);

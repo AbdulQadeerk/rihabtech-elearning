@@ -138,9 +138,14 @@ class RazorpayService {
       });
 
       return transactionId;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating subscription:', error);
-      throw new Error('Failed to create subscription');
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.title ||
+        (typeof error?.response?.data === 'string' ? error.response.data : null) ||
+        error?.message;
+      throw new Error(apiMessage || 'Failed to create subscription');
     }
   }
 

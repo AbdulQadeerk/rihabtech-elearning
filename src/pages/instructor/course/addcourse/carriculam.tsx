@@ -4217,13 +4217,14 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                                 <div key={qIdx} className="border p-3 rounded bg-white">
                                                                                   <div className="flex justify-between items-start mb-2 w-full gap-2">
                                                                                     <div className="flex-1">
-                                                                                      <Input
-                                                                                        className="ins-control-border mb-2"
-                                                                                        placeholder="Question"
-                                                                                        name={`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].question`}
-                                                                                        value={question.question}
-                                                                                        onChange={formik.handleChange}
-                                                                                      />
+                                                                                      <div className="mb-2">
+                                                                                        <RichTextEditor
+                                                                                          value={question.question || ''}
+                                                                                          onChange={(html) => formik.setFieldValue(`sections[${sectionIdx}].items[${itemIdx}].questions[${qIdx}].question`, html)}
+                                                                                          placeholder="Question"
+                                                                                          height="200px"
+                                                                                        />
+                                                                                      </div>
                                                                                       <select
                                                                                         className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                                         value={question.isMultipleChoice ? 'multiple' : 'single'}
@@ -4395,7 +4396,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                                                                         <ol className="list-decimal ml-5 mt-2">
                                                                           {item.questions.map((q, qIdx) => (
                                                                             <li key={qIdx} className="mb-3">
-                                                                              <div className="font-medium mb-1">{q.question}</div>
+                                                                              <div className="font-medium mb-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                                                                               <ul className="list-disc ml-5">
                                                                                 {q.options.map((opt, optIdx) => (
                                                                                   <li key={optIdx} className={

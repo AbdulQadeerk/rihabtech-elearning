@@ -207,20 +207,11 @@ export default function InstructorPayment() {
     } catch (error) {
       console.error('Error loading payment data:', error);
       toast.error('Failed to load payment data');
-      setError('Failed to load payment data. Using mock data instead.');
-      
-      // Use mock data as fallback
-      console.log('Loading mock data as fallback...');
-      setEarningsSummary(instructorPayoutApiService.getMockEarningsSummary());
-      setPayoutHistory(instructorPayoutApiService.getMockPayoutHistory());
-      setCourseEarnings(instructorPayoutApiService.getMockCourseEarnings());
-      
-      // Also set monthly earnings
-      setMonthlyEarnings([
-        { month: '2025-01', earnings: 1500 },
-        { month: '2025-02', earnings: 2200 },
-        { month: '2025-03', earnings: 1800 }
-      ]);
+      setError('Failed to load payment data.');
+      setEarningsSummary(null);
+      setPayoutHistory([]);
+      setCourseEarnings([]);
+      setMonthlyEarnings([]);
     } finally {
       console.log('Setting loading to false');
       setLoading(false);

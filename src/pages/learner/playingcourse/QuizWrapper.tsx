@@ -46,16 +46,32 @@ const QuizWrapper: React.FC = () => {
     
     console.log('QuizWrapper - Looking for data:', { hash, search, dataParam, courseIdParam, sectionIdParam, quizIdParam, assignmentIdParam });
     
-    if (dataParam) {
+    if (dataParam === 'session') {
+      // Large quiz payloads (e.g. base64 images) are passed via sessionStorage
+      // instead of the URL to avoid exceeding browser URL length limits.
+      try {
+        const storedData = sessionStorage.getItem('activeQuizData');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          console.log('QuizWrapper - Parsed quiz data from sessionStorage:', parsedData);
+          setQuizData(parsedData);
+        } else {
+          console.error('No quiz data found in sessionStorage for key "activeQuizData"');
+        }
+      } catch (error) {
+        console.error('Error parsing quiz data from sessionStorage:', error);
+      }
+    } else if (dataParam) {
+      // Backward compatibility: data encoded directly in the URL.
       try {
         const parsedData = JSON.parse(decodeURIComponent(dataParam));
-        console.log('QuizWrapper - Parsed quiz data:', parsedData);
+        console.log('QuizWrapper - Parsed quiz data from URL:', parsedData);
         setQuizData(parsedData);
       } catch (error) {
-        console.error('Error parsing quiz data:', error);
+        console.error('Error parsing quiz data from URL:', error);
       }
     } else {
-      console.log('No quiz data found in URL');
+      console.log('No quiz data found in URL or sessionStorage');
     }
     
     if (courseIdParam) {

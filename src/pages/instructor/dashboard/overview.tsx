@@ -99,20 +99,6 @@ export const Overview = () =>{
               console.log("Course watch time data loaded:", watchTimeData);
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
-                // Fallback to mock data
-                setDashboardStats(dashboardService.getMockDashboardStats());
-                setRevenueStats([
-                    { month: 'May', revenue: 8000, enrollments: 0, percentage: 80 },
-                    { month: 'Jun', revenue: 6500, enrollments: 0, percentage: 65 },
-                    { month: 'Jul', revenue: 8000, enrollments: 0, percentage: 80 },
-                    { month: 'Aug', revenue: 5000, enrollments: 0, percentage: 50 },
-                    { month: 'Sep', revenue: 10000, enrollments: 0, percentage: 100 },
-                    { month: 'Oct', revenue: 7500, enrollments: 0, percentage: 75 },
-                    { month: 'Nov', revenue: 7500, enrollments: 0, percentage: 75 },
-                    { month: 'Dec', revenue: 7500, enrollments: 0, percentage: 75 },
-                    { month: 'Jan', revenue: 8000, enrollments: 0, percentage: 80 },
-                    { month: 'Feb', revenue: 7000, enrollments: 0, percentage: 70 }
-                ]);
             } finally {
                 setLoading(false);
             }
@@ -122,7 +108,7 @@ export const Overview = () =>{
                 try {
                     setLoading(true);
                     
-                    const instructorId = user?.UserName || user?.email || 'abdulquader152@gmail.com'; // Fallback for testing
+                    const instructorId = user?.UserName || user?.email;
                     if (!instructorId) {
                         console.log("No user email found");
                         return;

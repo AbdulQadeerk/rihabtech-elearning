@@ -9,39 +9,10 @@ import {
 import { Button } from "../../../components/ui/button";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import { dashboardService, ReviewData } from "../../../utils/dashboardService";
+import { ReviewData } from "../../../utils/dashboardService";
+import { courseApiService } from "../../../utils/courseApiService";
+import { reviewApiService } from "../../../utils/reviewApiService";
 import { toast } from "sonner";
-
-interface Testimonial {
-  name: string;
-  role: string;
-  message: string;
-  rating: number;
-}
-
-const testimonials: Testimonial[] = [
-  {
-    name: "Mehul Shah",
-    role: "Student",
-    message:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla a eleifend elit. Orci varius natoque penatibus",
-    rating: 5,
-  },
-  {
-    name: "Mehul Shah",
-    role: "Student",
-    message:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla a eleifend elit. Orci varius natoque penatibus",
-    rating: 5,
-  },
-  {
-    name: "Mehul Shah",
-    role: "Student",
-    message:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla a eleifend elit. Orci varius natoque penatibus",
-    rating: 5,
-  },
-];
 
 export default function Reviews() {
   const [reviews, setReviews] = useState<ReviewData[]>([]);
@@ -65,7 +36,32 @@ export default function Reviews() {
       } else {
         setLoading(true);
       }
-      const reviewsData = await dashboardService.getReviewsData(user.UserName);
+      const instructorCourses = await courseApiService.getAllCourses();
+      const reviewsData: ReviewData[] = [];
+
+      for (const course of instructorCourses) {
+        if (!course.id) continue;
+        try {
+          const courseReviews = await reviewApiService.getCourseReviews(course.id, false);
+          courseReviews.forEach((review) => {
+            reviewsData.push({
+              id: review.id.toString(),
+              studentName: review.userName || review.userEmail || "Anonymous",
+              studentRole: "Student",
+              rating: review.rating,
+              reviewText: review.comment,
+              courseId: course.id.toString(),
+              courseTitle: course.title || "Unknown Course",
+              reviewDate: review.createdAt,
+              isReplied: false,
+            });
+          });
+        } catch (reviewError) {
+          console.error(`Error loading reviews for course ${course.id}:`, reviewError);
+        }
+      }
+
+      reviewsData.sort((a, b) => b.reviewDate.getTime() - a.reviewDate.getTime());
       setReviews(reviewsData);
 
       // Extract unique courses from reviews
@@ -81,61 +77,9 @@ export default function Reviews() {
       setCourses(uniqueCourses);
     } catch (error) {
       console.error("Error loading reviews data:", error);
-      // Fallback to mock data
-      const mockReviews = [
-        {
-          id: "1",
-          studentName: "Mehul Shah",
-          studentRole: "Student",
-          rating: 5,
-          reviewText:
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla a eleifend elit. Orci varius natoque penatibus",
-          courseId: "course-1",
-          courseTitle: "Web Development Fundamentals",
-          reviewDate: new Date("2025-01-15"),
-          isReplied: false,
-        },
-        {
-          id: "2",
-          studentName: "Rajesh Kumar",
-          studentRole: "Student",
-          rating: 4,
-          reviewText:
-            "Excellent course with practical examples. Highly recommended for beginners.",
-          courseId: "course-2",
-          courseTitle: "React.js Masterclass",
-          reviewDate: new Date("2025-01-10"),
-          isReplied: true,
-          replyText:
-            "Thank you for your feedback! We are glad you found the course helpful.",
-          replyDate: new Date("2025-01-11"),
-        },
-        {
-          id: "3",
-          studentName: "Priya Singh",
-          studentRole: "Student",
-          rating: 5,
-          reviewText:
-            "Great content and clear explanations. The instructor is very knowledgeable.",
-          courseId: "course-3",
-          courseTitle: "Node.js Backend Development",
-          reviewDate: new Date("2025-01-08"),
-          isReplied: false,
-        },
-      ];
-      setReviews(mockReviews);
-
-      // Extract courses from mock data
-      const mockCourses = Array.from(
-        new Set(mockReviews.map((review) => review.courseId))
-      ).map((courseId) => {
-        const review = mockReviews.find((r) => r.courseId === courseId);
-        return {
-          id: courseId,
-          title: review?.courseTitle || "Unknown Course",
-        };
-      });
-      setCourses(mockCourses);
+      toast.error("Failed to load reviews");
+      setReviews([]);
+      setCourses([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

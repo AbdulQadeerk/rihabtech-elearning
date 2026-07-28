@@ -94,24 +94,10 @@ const LearningReminderDialog = ({ isOpen, setIsOpen, onSave, editingReminder, co
       const availableCourses = await firebaseLearningRemindersService.getAvailableCourses(userId, instructorId);
       console.log('Loaded courses from Firebase:', availableCourses);
       
-      if (availableCourses.length === 0) {
-        console.log('No courses found, using fallback courses');
-        setCourses([
-          { id: '1', title: 'Course: The Python Developer Essentials Immersive Bootcamp', instructorId: instructorId || 'instructor1' },
-          { id: '2', title: 'Course: React JS Frontend Web Development for Beginners', instructorId: instructorId || 'instructor2' },
-          { id: '3', title: 'Course: Introduction To Python Programming', instructorId: instructorId || 'instructor3' }
-        ]);
-      } else {
-        setCourses(availableCourses);
-      }
+      setCourses(availableCourses);
     } catch (error) {
       console.error('Error loading courses:', error);
-      // Fallback to mock courses if Firebase fails
-      setCourses([
-        { id: '1', title: 'Course: The Python Developer Essentials Immersive Bootcamp', instructorId: instructorId || 'instructor1' },
-        { id: '2', title: 'Course: React JS Frontend Web Development for Beginners', instructorId: instructorId || 'instructor2' },
-        { id: '3', title: 'Course: Introduction To Python Programming', instructorId: instructorId || 'instructor3' }
-      ]);
+      setCourses([]);
     } finally {
       setLoadingCourses(false);
     }

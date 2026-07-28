@@ -503,7 +503,10 @@ const PreviewCourse = () => {
                                   <ol className="list-decimal ml-6">
                                     {item.questions.map((q: any, qIdx: number) => (
                                       <li key={qIdx} className="mb-1">
-                                        <div>Q: {q.question}</div>
+                                        <div className="flex gap-1 items-start">
+                                          <span>Q:</span>
+                                          <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
+                                        </div>
                                         <div>Options: {q.options && q.options.join(', ')}</div>
                                         <div>Correct: {Array.isArray(q.correctOption) ? q.correctOption.map((idx: number) => q.options[idx]).join(', ') : q.options[q.correctOption]}</div>
                                       </li>
@@ -524,7 +527,10 @@ const PreviewCourse = () => {
                                   <ol className="list-decimal ml-6">
                                     {item.questions.map((q: any, qIdx: number) => (
                                       <li key={qIdx} className="mb-1">
-                                        <div>Q: {q.question}</div>
+                                        <div className="flex gap-1 items-start">
+                                          <span>Q:</span>
+                                          <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
+                                        </div>
                                         <div>Marks: {q.marks}</div>
                                         {q.answer && <div>Answer: {q.answer}</div>}
                                         {q.maxWordLimit && <div>Word Limit: {q.maxWordLimit}</div>}

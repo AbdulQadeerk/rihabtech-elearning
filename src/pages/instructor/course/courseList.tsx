@@ -142,9 +142,8 @@ export default function CourseList() {
       setHasPendingPayouts(hasPending);
     } catch (error) {
       console.error('Error loading payout data:', error);
-      // Use mock data as fallback
-      setEarningsSummary(payoutService.getMockEarningsSummary());
-      setHasPendingPayouts(true);
+      setEarningsSummary(null);
+      setHasPendingPayouts(false);
     }
   }, [user?.UserName]);
 

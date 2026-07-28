@@ -1,9 +1,9 @@
 import { BookOpen, ChevronDown, ChevronRight, Filter, User2, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
-import { useState, useEffect, useCallback, use } from "react";
-import { Checkbox } from "../../../components/ui/checkbox";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { courseApiService, CourseGetAllResponse, SubCategory } from "../../../utils/courseApiService";
+import { courseApiService, CourseGetAllResponse } from "../../../utils/courseApiService";
+import { FilterSidebar } from "../../../components/ui/FilterSidebar";
 
 export default function CourseList() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -216,7 +216,6 @@ export default function CourseList() {
     // Topic/SubCategory filter (client-side since we're matching by subCategoryText)
     if (selectedTopics.length > 0) {
       filtered = filtered.filter(course => {
-        console.log('Filtering course:', course.title, 'with subCategoryText:', course.subCategoryText);
         return selectedTopics.some(topic => {
           // Match by subCategory ID or title
           const topicId = String(topic);
@@ -278,12 +277,10 @@ export default function CourseList() {
 
   return (
     <section className="min-h-screen bg-white font-sans relative">
-      {/* Breadcrumb Navigation */}
-      {/* Main content with desktop filter */}
       <div className="flex flex-row w-full justify-center">
         {/* Filter Sidebar - Desktop */}
         <div className={`hidden lg:block lg:w-1/4 xl:w-1/5 pr-8 ${isFilterOpen ? '' : 'lg:hidden'}`}>
-          <FilterContent 
+          <FilterSidebar 
             categoryId={categoryId}
             selectedCategories={selectedCategories}
             setSelectedCategories={setSelectedCategories}
@@ -316,7 +313,6 @@ export default function CourseList() {
             </div>
           </div>
 
-          {/* Design Category Header */}
           <div className="container mx-auto px-4 py-2">
             <h1 className="page-title mb-6">
               {subCategoryName ? `${categoryName} - ${subCategoryName}` : (categoryName ?? 'All Courses')}
@@ -344,7 +340,6 @@ export default function CourseList() {
                   Step into a world of endless learning opportunities with our online course marketplace. Browse a wide range of expertly crafted courses that help you build new skills, grow professionally, and follow your passions. Whether you're aiming to level up your career or dive into a personal hobby, find the perfect course that fits your goals and sparks your curiosity.
                 </p>
 
-                {/* Filter and Results */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
                   <Button
                     className="mb-4 md:mb-0 px-8 py-2 rounded-none flex items-center justify-center"
@@ -389,7 +384,7 @@ export default function CourseList() {
                     </Button>
                   </div>
 
-                  <FilterContent 
+                  <FilterSidebar 
                     categoryId={categoryId}
                     selectedCategories={selectedCategories}
                     setSelectedCategories={setSelectedCategories}
@@ -413,8 +408,6 @@ export default function CourseList() {
                 ></div>
               )}
 
-
-
               {/* Course Grid */}
               <div className={`w-full`}>
                 {loading ? (
@@ -430,7 +423,7 @@ export default function CourseList() {
                 ) : (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 mt-2 mb-6">
-                      {displayedCourses.map((course, index) => (
+                      {displayedCourses.map((course) => (
                         <CourseCard key={course.id} course={course} />
                       ))}
                     </div>
@@ -487,385 +480,6 @@ export default function CourseList() {
   )
 }
 
-// Accordion Component
-type FilterAccordionProps = {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-};
-
-function FilterAccordion({ title, children, defaultOpen = true }: FilterAccordionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border-b border-gray-200 py-4">
-      <button 
-        className="flex justify-between items-center w-full text-left"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <ChevronDown 
-          className={`transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-          size={20} 
-        />
-      </button>
-      
-      <div className={`mt-4 transition-all duration-300 ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// Filter Content Component with Accordions
-function FilterContent({ 
-  categoryId,
-  selectedCategories,
-  setSelectedCategories,
-  selectedRatings, 
-  setSelectedRatings, 
-  selectedPrice, 
-  setSelectedPrice, 
-  selectedDuration, 
-  setSelectedDuration, 
-  selectedTopics, 
-  setSelectedTopics 
-}: {
-  categoryId?: string;
-  selectedCategories: string[];
-  setSelectedCategories: (value: string[]) => void;
-  selectedRatings: string[];
-  setSelectedRatings: (value: string[]) => void;
-  selectedPrice: string[];
-  setSelectedPrice: (value: string[]) => void;
-  selectedDuration: string[];
-  setSelectedDuration: (value: string[]) => void;
-  selectedTopics: string[];
-  setSelectedTopics: (value: string[]) => void;
-}) {
-  // State for expanded sections
-  const [showMoreDuration, setShowMoreDuration] = useState(false);
-  const [showMoreTopics, setShowMoreTopics] = useState(false);
-  const [showMoreCategories, setShowMoreCategories] = useState(false);
-  const [additionalTopics, setadditionalTopics] = useState<SubCategory[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  
-  // Additional items that will show when "Show more" is clicked
-  const additionalDurations = [
-    { id: "duration-17-plus", label: "17+ Hours" },
-    { id: "duration-all", label: "All Durations" }
-  ];
-
-  useEffect(() => {
-    courseApiService.getPublicCategories().then(data => setCategories(data));
-  }, []);
-
-  useEffect(() => {
-    // Simulate fetching additional topics from an API or data source
-    const fetchAdditionalTopics = async () => {
-      // Replace this with actual data fetching logic if needed 
-      courseApiService.getPublicSubCategories().then((data) => {
-        let filteredData = data;
-        if (selectedCategories && selectedCategories.length > 0) {
-          filteredData = data.filter(c => selectedCategories.includes(String(c.categoryId)));
-        } else if (categoryId) {
-          filteredData = data.filter(c => c.categoryId === parseInt(categoryId, 10));
-        }
-        setadditionalTopics(filteredData as any);
-      });
-    }
-    fetchAdditionalTopics();
-  }, [selectedCategories, categoryId]);
-
-
-  // Handle price filter changes
-  const handlePriceChange = (priceType: string, checked: boolean) => {
-    if (checked) {
-      setSelectedPrice([...selectedPrice, priceType]);
-    } else {
-      setSelectedPrice(selectedPrice.filter(p => p !== priceType));
-    }
-  };
-
-  // Handle duration filter changes
-  const handleDurationChange = (durationId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedDuration([...selectedDuration, durationId]);
-    } else {
-      setSelectedDuration(selectedDuration.filter(d => d !== durationId));
-    }
-  };
-
-  // Handle topic filter changes
-  const handleTopicChange = (topicId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedTopics([...selectedTopics, topicId]);
-    } else {
-      setSelectedTopics(selectedTopics.filter(t => t !== topicId));
-    }
-  };
-
-  // Handle category filter changes
-  const handleCategoryChange = (catId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedCategories([catId]); // API currently supports one category, so overwrite
-      setSelectedTopics([]); // Reset subcategories when category changes
-    } else {
-      setSelectedCategories([]);
-      setSelectedTopics([]);
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      
-      {/* Category Filter */}
-      <FilterAccordion title="Category">
-        <div className="space-y-3 font-bold max-h-64 overflow-y-auto">
-          {categories.length > 0 && (
-            <>
-              {categories.map((cat: any) => {
-                if (!showMoreCategories && categories.indexOf(cat) > 0) {
-                  return null;
-                }
-                return (
-                  <div key={cat.id} className="flex items-center">
-                    <Checkbox 
-                      id={`cat-${cat.id}`} 
-                      className="mr-3" 
-                      checked={selectedCategories.includes(String(cat.id))}
-                      onCheckedChange={(checked) => handleCategoryChange(String(cat.id), checked as boolean)}
-                    />
-                    <label htmlFor={`cat-${cat.id}`}>{cat.title}</label>
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-        {categories.length > 0 && (
-          <button 
-            className="text-purple-600 mt-3 font-medium focus:outline-none"
-            onClick={() => setShowMoreCategories(!showMoreCategories)}
-          >
-            {showMoreCategories ? "Show less" : "Show more"}
-          </button>
-        )}
-      </FilterAccordion>
-
-      {/* Topic Filter */}
-      <FilterAccordion title="Sub Category">
-        <div className="space-y-3 font-bold max-h-64 overflow-y-auto">
-          {additionalTopics.length > 0 && (
-            <>
-              {additionalTopics.map((topic: any) => {
-                // Show first topic always, others only when "Show more" is clicked
-                if (!showMoreTopics && additionalTopics.indexOf(topic) > 0) {
-                  return null;
-                }
-                return (
-                  <div key={topic.id} className="flex items-center">
-                    <Checkbox 
-                      id={String(topic.id)} 
-                      className="mr-3" 
-                      checked={selectedTopics.includes(String(topic.id))}
-                      onCheckedChange={(checked) => handleTopicChange(String(topic.id), checked as boolean)}
-                    />
-                    <label htmlFor={String(topic.id)}>{topic.title}</label>
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-        {additionalTopics.length > 0 && (
-          <button 
-            className="text-purple-600 mt-3 font-medium focus:outline-none"
-            onClick={() => setShowMoreTopics(!showMoreTopics)}
-          >
-            {showMoreTopics ? "Show less" : "Show more"}
-          </button>
-        )}
-      </FilterAccordion>
-
-      <FilterAccordion title="Price">
-        <div className="space-y-3 font-bold">
-          <div className="flex items-center">
-            <Checkbox 
-              id="free" 
-              className="mr-3" 
-              checked={selectedPrice.includes('free')}
-              onCheckedChange={(checked) => handlePriceChange('free', checked as boolean)}
-            />
-            <label htmlFor="free">Free</label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="paid" 
-              className="mr-3" 
-              checked={selectedPrice.includes('paid')}
-              onCheckedChange={(checked) => handlePriceChange('paid', checked as boolean)}
-            />
-            <label htmlFor="paid">Paid</label>
-          </div>
-        </div>
-      </FilterAccordion>
-
-      {/* Video Duration Filter */}
-      <FilterAccordion title="Video Duration">
-        <div className="space-y-3 font-bold">
-          <div className="flex items-center">
-            <Checkbox 
-              id="duration-0-1" 
-              className="mr-3" 
-              checked={selectedDuration.includes('duration-0-1')}
-              onCheckedChange={(checked) => handleDurationChange('duration-0-1', checked as boolean)}
-            />
-            <label htmlFor="duration-0-1">0-1 Hour</label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="duration-1-3" 
-              className="mr-3" 
-              checked={selectedDuration.includes('duration-1-3')}
-              onCheckedChange={(checked) => handleDurationChange('duration-1-3', checked as boolean)}
-            />
-            <label htmlFor="duration-1-3">1-3 Hours</label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="duration-3-6" 
-              className="mr-3" 
-              checked={selectedDuration.includes('duration-3-6')}
-              onCheckedChange={(checked) => handleDurationChange('duration-3-6', checked as boolean)}
-            />
-            <label htmlFor="duration-3-6">3-6 Hours</label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="duration-6-17" 
-              className="mr-3" 
-              checked={selectedDuration.includes('duration-6-17')}
-              onCheckedChange={(checked) => handleDurationChange('duration-6-17', checked as boolean)}
-            />
-            <label htmlFor="duration-6-17">6-17 Hours</label>
-          </div>
-          
-          {/* Additional items that appear when "Show more" is clicked */}
-          {showMoreDuration && (
-            <>
-              {additionalDurations.map(duration => (
-                <div key={duration.id} className="flex items-center">
-                  <Checkbox 
-                    id={duration.id} 
-                    className="mr-3" 
-                    checked={selectedDuration.includes(duration.id)}
-                    onCheckedChange={(checked) => handleDurationChange(duration.id, checked as boolean)}
-                  />
-                  <label htmlFor={duration.id}>{duration.label}</label>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-        <button 
-          className="text-purple-600 mt-3 font-medium focus:outline-none"
-          onClick={() => setShowMoreDuration(!showMoreDuration)}
-        >
-          {showMoreDuration ? "Show less" : "Show more"}
-        </button>
-      </FilterAccordion>
-      
-      
-
-      {/* Ratings Filter */}
-      <FilterAccordion title="Ratings">
-        <div className="space-y-3 font-bold">
-          <div className="flex items-center">
-            <Checkbox 
-              id="rating-4.5" 
-              className="mr-3" 
-              checked={selectedRatings.includes("4.5")}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  setSelectedRatings([...selectedRatings, "4.5"]);
-                } else {
-                  setSelectedRatings(selectedRatings.filter(r => r !== "4.5"));
-                }
-              }}
-            />
-            <label htmlFor="rating-4.5" className="flex items-center">
-              <div className="flex text-yellow-400">
-                ★★★★<span className="text-yellow-400">½</span>
-              </div>
-              <span className="ml-2">4.5 & up (320)</span>
-            </label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="rating-4.0" 
-              className="mr-3" 
-              checked={selectedRatings.includes("4.0")}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  setSelectedRatings([...selectedRatings, "4.0"]);
-                } else {
-                  setSelectedRatings(selectedRatings.filter(r => r !== "4.0"));
-                }
-              }}
-            />
-            <label htmlFor="rating-4.0" className="flex items-center">
-              <div className="flex text-yellow-400">
-                ★★★★<span className="text-gray-300">★</span>
-              </div>
-              <span className="ml-2">4.0 & up (669)</span>
-            </label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="rating-3.5" 
-              className="mr-3" 
-              checked={selectedRatings.includes("3.5")}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  setSelectedRatings([...selectedRatings, "3.5"]);
-                } else {
-                  setSelectedRatings(selectedRatings.filter(r => r !== "3.5"));
-                }
-              }}
-            />
-            <label htmlFor="rating-3.5" className="flex items-center">
-              <div className="flex text-yellow-400">
-                ★★★<span className="text-yellow-400">½</span><span className="text-gray-300">★</span>
-              </div>
-              <span className="ml-2">3.5 & up (764)</span>
-            </label>
-          </div>
-          <div className="flex items-center">
-            <Checkbox 
-              id="rating-3.0" 
-              className="mr-3" 
-              checked={selectedRatings.includes("3.0")}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  setSelectedRatings([...selectedRatings, "3.0"]);
-                } else {
-                  setSelectedRatings(selectedRatings.filter(r => r !== "3.0"));
-                }
-              }}
-            />
-            <label htmlFor="rating-3.0" className="flex items-center">
-              <div className="flex text-yellow-400">
-                ★★★<span className="text-gray-300">★★</span>
-              </div>
-              <span className="ml-2">3.0 & up (781)</span>
-            </label>
-          </div>
-        </div>
-      </FilterAccordion>
-    </div>
-  );
-}
 
 
 export function CourseCard({ course, progress = false }: { 

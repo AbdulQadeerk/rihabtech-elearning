@@ -195,11 +195,6 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
           console.log('Using course promo video as fallback:', videoUrl);
         }
         
-        if (!videoUrl && item.contentType === 'video') {
-          videoUrl = '/courses/video2 - Trim.mp4';
-          console.log('Using test video as fallback:', videoUrl);
-        }
-        
                  return {
            title: item.lectureName || 'Untitled Lecture',
            type: contentType,

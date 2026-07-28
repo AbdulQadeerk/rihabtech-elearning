@@ -43,7 +43,7 @@ class GroupsService {
       const groupsSnapshot = await getDocs(groupsQuery);
 
       if (groupsSnapshot.empty) {
-        return this.getMockGroupsData();
+        return [];
       }
 
       const groups: GroupData[] = [];
@@ -107,7 +107,7 @@ class GroupsService {
 
     } catch (error) {
       console.error('Error getting groups data:', error);
-      return this.getMockGroupsData();
+      return [];
     }
   }
 
@@ -312,115 +312,6 @@ class GroupsService {
       console.error('Error removing course from group:', error);
       throw new Error('Failed to remove course from group');
     }
-  }
-
-  // Mock data for fallback
-  getMockGroupsData(): GroupData[] {
-    return [
-      {
-        id: '1',
-        name: 'Web Development Cohort 2025',
-        description: 'Advanced web development group for experienced developers looking to master modern frameworks and tools.',
-        instructorId: 'instructor-1',
-        courseId: 'course-1',
-        status: 'active',
-        memberCount: 24,
-        courseCount: 3,
-        maxMembers: 30,
-        createdAt: new Date('2025-01-15'),
-        updatedAt: new Date('2025-08-20'),
-        members: [
-          {
-            id: 'member-1',
-            name: 'Mehul Shah',
-            email: 'mehul.shah@email.com',
-            role: 'student',
-            joinedAt: new Date('2025-01-20')
-          },
-          {
-            id: 'member-2',
-            name: 'Rajesh Kumar',
-            email: 'rajesh.kumar@email.com',
-            role: 'moderator',
-            joinedAt: new Date('2025-01-18')
-          }
-        ],
-        courses: ['course-1', 'course-2', 'course-3'],
-        tags: ['web-development', 'react', 'nodejs']
-      },
-      {
-        id: '2',
-        name: 'Data Science Beginners',
-        description: 'Introduction to data science concepts, Python programming, and statistical analysis for beginners.',
-        instructorId: 'instructor-1',
-        courseId: 'course-4',
-        status: 'active',
-        memberCount: 18,
-        courseCount: 2,
-        maxMembers: 25,
-        createdAt: new Date('2025-02-10'),
-        updatedAt: new Date('2025-08-18'),
-        members: [
-          {
-            id: 'member-3',
-            name: 'Priya Singh',
-            email: 'priya.singh@email.com',
-            role: 'student',
-            joinedAt: new Date('2025-02-15')
-          }
-        ],
-        courses: ['course-4', 'course-5'],
-        tags: ['data-science', 'python', 'statistics']
-      },
-      {
-        id: '3',
-        name: 'UI/UX Design Workshop',
-        description: 'Hands-on workshop for learning user interface and user experience design principles.',
-        instructorId: 'instructor-1',
-        courseId: 'course-6',
-        status: 'inactive',
-        memberCount: 12,
-        courseCount: 1,
-        maxMembers: 20,
-        createdAt: new Date('2025-03-05'),
-        updatedAt: new Date('2025-07-30'),
-        members: [
-          {
-            id: 'member-4',
-            name: 'Amit Patel',
-            email: 'amit.patel@email.com',
-            role: 'student',
-            joinedAt: new Date('2025-03-10')
-          }
-        ],
-        courses: ['course-6'],
-        tags: ['ui-ux', 'design', 'workshop']
-      },
-      {
-        id: '4',
-        name: 'Mobile App Development',
-        description: 'Comprehensive mobile app development using React Native and Flutter frameworks.',
-        instructorId: 'instructor-1',
-        courseId: 'course-7',
-        status: 'active',
-        memberCount: 31,
-        courseCount: 4,
-        maxMembers: 40,
-        createdAt: new Date('2025-04-01'),
-        updatedAt: new Date('2025-08-22'),
-        members: [
-          {
-            id: 'member-5',
-            name: 'Neha Sharma',
-            email: 'neha.sharma@email.com',
-            role: 'student',
-            joinedAt: new Date('2025-04-05')
-          }
-        ],
-        courses: ['course-7', 'course-8', 'course-9', 'course-10'],
-        tags: ['mobile-development', 'react-native', 'flutter']
-      }
-    ];
   }
 }
 

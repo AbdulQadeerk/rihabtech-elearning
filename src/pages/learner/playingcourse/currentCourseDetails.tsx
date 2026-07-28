@@ -363,7 +363,7 @@ export default function CourseDetailsPage() {
   const progressLoadingRef = useRef(false);
 
   // Course info (for demonstration)
-  const instructorId = courseData?.instructorId || "instructor-456";
+  const instructorId = courseData?.instructorId;
   const studentId = user?.email || user?.uid || "student-123"; // Replace with actual logged-in user ID
 
   useEffect(() => {
@@ -1818,8 +1818,15 @@ export default function CourseDetailsPage() {
           className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
           onClick={() => {
             console.log('Start Quiz button clicked, quiz data:', quizData);
-            const encodedData = encodeURIComponent(JSON.stringify(quizData));
-            console.log('Encoded data:', encodedData);
+
+            // Store the (potentially large) quiz data in sessionStorage instead of the
+            // URL. Base64 images can make the JSON exceed browser URL length limits,
+            // which truncates the payload and breaks HTML/image rendering on the quiz page.
+            try {
+              sessionStorage.setItem('activeQuizData', JSON.stringify(quizData));
+            } catch (error) {
+              console.error('Failed to store quiz data in sessionStorage:', error);
+            }
 
             // Get courseId from URL or state
             const courseIdFromUrl = getCourseIdFromURL();
@@ -1836,7 +1843,7 @@ export default function CourseDetailsPage() {
             const assignmentId = isAssignment ? (module.id || module.assignmentId) : null;
             const lectureId = module.lectureId;
 
-            let url = `#/learner/quiz?data=${encodedData}`;
+            let url = `#/learner/quiz?data=session`;
             if (courseIdNum) url += `&courseId=${courseIdNum}`;
             if (sectionId) url += `&sectionId=${sectionId}`;
             if (quizId) url += `&quizId=${quizId}`;

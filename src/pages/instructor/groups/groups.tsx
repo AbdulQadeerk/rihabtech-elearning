@@ -41,10 +41,9 @@ export const Groups = () => {
         console.log('Loaded groups:', groupsData);
       } catch (error) {
         console.error('Error loading groups:', error);
-        // Fallback to mock data
-        const mockGroups = groupsService.getMockGroupsData();
-        setGroups(mockGroups);
-        setFilteredGroups(mockGroups);
+        setGroups([]);
+        setFilteredGroups([]);
+        toast.error('Failed to load groups');
       } finally {
         setLoading(false);
       }
@@ -84,29 +83,8 @@ export const Groups = () => {
         setShowCreateModal(false);
         toast.success('Group created successfully!');
       } catch (firebaseError) {
-        console.warn('Firebase creation failed, creating mock group:', firebaseError);
-        
-        // Fallback to creating a mock group
-        const mockGroup: GroupData = {
-          id: Date.now().toString(), // Use timestamp as ID
-          name: groupData.name || 'New Group',
-          description: groupData.description || '',
-          instructorId: user.UserName,
-          courseId: groupData.courseId || '',
-          status: groupData.status || 'active',
-          memberCount: 0,
-          courseCount: 0,
-          maxMembers: groupData.maxMembers || 50,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          members: groupData.members || [],
-          courses: [],
-          tags: groupData.tags || []
-        };
-        
-        setGroups(prev => [mockGroup, ...prev]);
-        setShowCreateModal(false);
-        toast.success('Group created successfully! (Mock data)');
+        console.error('Firebase creation failed:', firebaseError);
+        toast.error('Failed to create group. Please try again.');
       }
     } catch (error) {
       console.error('Error creating group:', error);
@@ -120,19 +98,6 @@ export const Groups = () => {
     try {
       setIsDeleting(true);
       
-      // Check if this is a mock group
-      const isMockGroup = /^\d+$/.test(groupId);
-      
-      if (isMockGroup) {
-        // For mock groups, just update the local state
-        setGroups(prev => prev.filter(group => group.id !== groupId));
-        setShowDeleteConfirm(false);
-        setDeletingGroup(null);
-        toast.success('Group deleted successfully! (Mock data)');
-        return;
-      }
-      
-      // For real Firebase groups, delete from Firebase
       await groupsService.deleteGroup(groupId);
       setGroups(prev => prev.filter(group => group.id !== groupId));
       setShowDeleteConfirm(false);
@@ -165,23 +130,6 @@ export const Groups = () => {
       setIsUpdating(true);
       console.log('Updating group:', editingGroup.id, 'with data:', groupData);
       
-      // Check if this is a mock group (has simple ID like '1', '2', etc.)
-      const isMockGroup = /^\d+$/.test(editingGroup.id);
-      
-      if (isMockGroup) {
-        // For mock groups, just update the local state
-        setGroups(prev => prev.map(group => 
-          group.id === editingGroup.id 
-            ? { ...group, ...groupData, updatedAt: new Date() }
-            : group
-        ));
-        setShowEditModal(false);
-        setEditingGroup(null);
-        toast.success('Group updated successfully! (Mock data)');
-        return;
-      }
-      
-      // For real Firebase groups, update in Firebase
       await groupsService.updateGroup(editingGroup.id, groupData);
       
       setGroups(prev => prev.map(group => 
@@ -208,21 +156,6 @@ export const Groups = () => {
 
   const handleArchiveGroup = async (groupId: string) => {
     try {
-      // Check if this is a mock group
-      const isMockGroup = /^\d+$/.test(groupId);
-      
-      if (isMockGroup) {
-        // For mock groups, just update the local state
-        setGroups(prev => prev.map(group => 
-          group.id === groupId 
-            ? { ...group, status: 'archived', updatedAt: new Date() }
-            : group
-        ));
-        toast.success('Group archived successfully! (Mock data)');
-        return;
-      }
-      
-      // For real Firebase groups, update in Firebase
       await groupsService.updateGroup(groupId, { status: 'archived' });
       setGroups(prev => prev.map(group => 
         group.id === groupId 
@@ -238,21 +171,6 @@ export const Groups = () => {
 
   const handleRestoreGroup = async (groupId: string) => {
     try {
-      // Check if this is a mock group
-      const isMockGroup = /^\d+$/.test(groupId);
-      
-      if (isMockGroup) {
-        // For mock groups, just update the local state
-        setGroups(prev => prev.map(group => 
-          group.id === groupId 
-            ? { ...group, status: 'active', updatedAt: new Date() }
-            : group
-        ));
-        toast.success('Group restored successfully! (Mock data)');
-        return;
-      }
-      
-      // For real Firebase groups, update in Firebase
       await groupsService.updateGroup(groupId, { status: 'active' });
       setGroups(prev => prev.map(group => 
         group.id === groupId 
@@ -290,12 +208,6 @@ export const Groups = () => {
          <div>
            <h1 className="form-title mr-2">Groups</h1>
            <p className="text-gray-600">Manage your student groups and cohorts</p>
-           {groups.length > 0 && groups.some(g => /^\d+$/.test(g.id)) && (
-             <div className="flex items-center gap-2 mt-2">
-               <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-               <span className="text-sm text-yellow-700">Using demo data - changes will be saved locally</span>
-             </div>
-           )}
          </div>
          <div className="flex gap-3">
            <Button 
@@ -662,11 +574,10 @@ export const Groups = () => {
                // Transform Firebase data to match the UI structure
                const transformedCourses: CourseDisplayData[] = instructorCourses.map(course => ({
                    ...course,
-                   // Add mock data for fields not in Firebase (for now)
-                   earnings: Math.floor(Math.random() * 5000) + 500, // Random earnings between 500-5500
-                   enrollments: Math.floor(Math.random() * 100) + 20, // Random enrollments between 20-120
-                   ratings: Math.floor(Math.random() * 200) + 500, // Random ratings between 500-700
-                   ratingScore: parseFloat((Math.random() * 2 + 3).toFixed(1)) // Random rating between 3.0-5.0
+                   earnings: course.members?.length ? course.members.length * 100 : 0,
+                   enrollments: course.members?.length || 0,
+                   ratings: 0,
+                   ratingScore: 0
                }));
                
                console.log("Transformed courses:", transformedCourses);
@@ -969,11 +880,10 @@ export const Groups = () => {
                // Transform Firebase data to match the UI structure
                const transformedCourses: CourseDisplayData[] = instructorCourses.map(course => ({
                    ...course,
-                   // Add mock data for fields not in Firebase (for now)
-                   earnings: Math.floor(Math.random() * 5000) + 500, // Random earnings between 500-5500
-                   enrollments: Math.floor(Math.random() * 100) + 20, // Random enrollments between 20-120
-                   ratings: Math.floor(Math.random() * 200) + 500, // Random ratings between 500-700
-                   ratingScore: parseFloat((Math.random() * 2 + 3).toFixed(1)) // Random rating between 3.0-5.0
+                   earnings: course.members?.length ? course.members.length * 100 : 0,
+                   enrollments: course.members?.length || 0,
+                   ratings: 0,
+                   ratingScore: 0
                }));
                
                console.log("Transformed courses:", transformedCourses);

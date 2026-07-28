@@ -19,7 +19,8 @@ export const CourseWatchTime = () => {
     const loadCourseWatchTimeData = async () => {
       try {
         setLoading(true);
-        const instructorId = user?.UserName || user?.email || 'abdulquader152@gmail.com';
+        const instructorId = user?.UserName || user?.email;
+        if (!instructorId) return;
         const data = await courseWatchTimeService.getCourseWatchTimeData(instructorId);
         setCourseWatchTimeData(data);
         console.log('Course watch time data loaded:', data);
@@ -41,7 +42,8 @@ export const CourseWatchTime = () => {
       }
 
       try {
-        const instructorId = user?.UserName || user?.email || 'abdulquader152@gmail.com';
+        const instructorId = user?.UserName || user?.email;
+        if (!instructorId) return;
         const progress = await courseWatchTimeService.getStudentCourseProgress(instructorId, selectedCourse);
         setStudentProgress(progress);
         console.log('Student progress loaded for course:', selectedCourse, progress);

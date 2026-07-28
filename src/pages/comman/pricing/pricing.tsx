@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { SubscriptionPaymentModal } from "../../../components/ui/SubscriptionPaymentModal";
 import { pricingService, PricingPlan, PricingBreakdown } from "../../../utils/pricingService";
 import { getUserActiveSubscription, Subscription } from "../../../utils/subscriptionService";
+import { subscriptionApiService } from "../../../utils/subscriptionApiService";
 import { couponService, Coupon } from "../../../utils/couponService";
 import { courseApiService, Category } from "../../../utils/courseApiService";
 
@@ -33,6 +34,7 @@ export default function Pricing() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [activeSubscription, setActiveSubscription] = useState<Subscription | null>(null);
+  const [usedOneTimePlanIds, setUsedOneTimePlanIds] = useState<Set<string>>(new Set());
 
   // Coupon state — per plan
   const [couponCodes, setCouponCodes] = useState<Record<string, string>>({});
@@ -53,8 +55,22 @@ export default function Pricing() {
       getUserActiveSubscription(user.email || user.uid)
         .then((sub) => setActiveSubscription(sub))
         .catch(console.error);
+
+      subscriptionApiService
+        .getUserSubscriptions(user.email || user.uid)
+        .then((subs) => {
+          const used = new Set(
+            (subs || [])
+              .filter((s) => ["Active", "Expired", "Cancelled"].includes(s.status))
+              .map((s) => s.planId?.toString())
+              .filter(Boolean) as string[]
+          );
+          setUsedOneTimePlanIds(used);
+        })
+        .catch(console.error);
     } else {
       setActiveSubscription(null);
+      setUsedOneTimePlanIds(new Set());
     }
   }, [user]);
 
@@ -122,6 +138,10 @@ export default function Pricing() {
       window.location.hash = "#/login";
       return;
     }
+    if (plan.isOneTimeUsePerUser && usedOneTimePlanIds.has(plan.id?.toString())) {
+      toast.error("This is a one-time plan. You have already used it and cannot subscribe again.");
+      return;
+    }
     setSelectedPlan(plan);
     setIsPaymentModalOpen(true);
   };
@@ -131,6 +151,15 @@ export default function Pricing() {
     try {
       const sub = await getUserActiveSubscription(user.email || user.uid);
       setActiveSubscription(sub);
+
+      const subs = await subscriptionApiService.getUserSubscriptions(user.email || user.uid);
+      const used = new Set(
+        (subs || [])
+          .filter((s) => ["Active", "Expired", "Cancelled"].includes(s.status))
+          .map((s) => s.planId?.toString())
+          .filter(Boolean) as string[]
+      );
+      setUsedOneTimePlanIds(used);
     } catch (err) {
       console.error(err);
     }
@@ -219,6 +248,8 @@ export default function Pricing() {
             {filteredPlans.map((plan) => {
               const breakdown = getPricingBreakdown(plan);
               const isCurrentPlan = activeSubscription?.planId?.toString() === plan.id?.toString();
+              const alreadyUsedOneTime =
+                !!plan.isOneTimeUsePerUser && usedOneTimePlanIds.has(plan.id?.toString());
 
               return (
                 <div
@@ -234,6 +265,11 @@ export default function Pricing() {
                         {plan.name}
                       </h2>
                       <p className="text-gray-600 mt-1">{plan.description}</p>
+                      {plan.isOneTimeUsePerUser && (
+                        <span className="inline-block mt-2 px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
+                          One-time use per user
+                        </span>
+                      )}
                     </div>
                     {isCurrentPlan && (
                       <div className="ml-4">
@@ -265,7 +301,7 @@ export default function Pricing() {
 
                   {/* Action button */}
                   <div className="mt-6">
-                    {!isCurrentPlan ? (
+                    {!isCurrentPlan && !alreadyUsedOneTime ? (
                       <button
                         className="mt-2 bg-primary border border-4 border-[#EFF0FF] text-white py-3 px-6 rounded-full font-medium hover:shadow-lg transition duration-300"
                         onClick={() => handleStartSubscription(plan)}
@@ -277,7 +313,7 @@ export default function Pricing() {
                         disabled
                         className="mt-2 bg-gray-300 text-gray-600 py-3 px-6 rounded-full font-medium cursor-not-allowed"
                       >
-                        Active
+                        {alreadyUsedOneTime && !isCurrentPlan ? "Already Used" : "Current Plan"}
                       </button>
                     )}
                   </div>

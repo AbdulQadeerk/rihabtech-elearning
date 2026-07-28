@@ -25,6 +25,7 @@ export interface PricingPlan {
   exclusiveContent: boolean; // For 6+ month plans
   premiumFeatures: boolean; // For annual plans
   earlyAccess: boolean; // For annual plans
+  isOneTimeUsePerUser?: boolean; // User can subscribe to this plan only once
   gstRate?: number | string; // GST percentage, can be string from Firebase
   
   createdAt?: Date;
@@ -87,6 +88,7 @@ class PricingService {
           exclusiveContent: data?.exclusiveContent || false,
           premiumFeatures: data?.premiumFeatures || false,
           earlyAccess: data?.earlyAccess || false,
+          isOneTimeUsePerUser: data?.isOneTimeUsePerUser || false,
           createdAt: data?.createdAt ? new Date(data.createdAt) : undefined,
           updatedAt: data?.updatedAt ? new Date(data.updatedAt) : undefined,
           gstRate: data?.taxPercentage || 18

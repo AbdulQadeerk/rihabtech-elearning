@@ -562,7 +562,7 @@ export default function CourseDetails() {
     );
   }
 
-  const sampleCartItem = {
+  const cartItem = {
     id: course.id || 1,
     title: course.title,
     description: course.description || "",
@@ -1016,7 +1016,7 @@ export default function CourseDetails() {
             <div className="bg-white rounded-[5px] shadow-[0px_10px_50px_0px_rgba(26,46,85,0.07)] p-4">
               <ReactPlayer
                 controls={true}
-                url={course.promoVideoUrl || '/courses/video2 - Trim.mp4'}
+                url={course.promoVideoUrl || ''}
                 light={course.thumbnailUrl || "/Logos/brand-icon.png"}
                 className="rounded-md mb-4 z-999"
                 height={'220px'}
@@ -1136,7 +1136,7 @@ export default function CourseDetails() {
       <CartModal
         isOpen={isCartModalOpen}
         setIsOpen={setIsCartModalOpen}
-        cartItem={sampleCartItem}
+        cartItem={cartItem}
       />
 
       {/* Checkout Modal */}

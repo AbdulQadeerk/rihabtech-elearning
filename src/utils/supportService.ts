@@ -99,7 +99,7 @@ class SupportService {
       const ticketsSnapshot = await getDocs(ticketsQuery);
       
       if (ticketsSnapshot.empty) {
-        return this.getMockTickets(instructorId);
+        return [];
       }
 
       const tickets: SupportTicket[] = [];
@@ -125,7 +125,7 @@ class SupportService {
       return tickets;
     } catch (error) {
       console.error('Error getting tickets:', error);
-      return this.getMockTickets(instructorId);
+      return [];
     }
   }
 
@@ -202,26 +202,11 @@ class SupportService {
 
   // Get unique categories for filtering
   async getTicketCategories(): Promise<string[]> {
-    try {
-      const tickets = await this.getTickets('demo'); // Use demo to get categories
-      const categories = Array.from(new Set(tickets.map(ticket => ticket.category)));
-      return categories;
-    } catch (error) {
-      console.error('Error getting ticket categories:', error);
-      return ['technical', 'billing', 'course', 'general', 'feature-request'];
-    }
+    return ['technical', 'billing', 'course', 'general', 'feature-request'];
   }
 
-  // Get unique priorities for filtering
   async getTicketPriorities(): Promise<string[]> {
-    try {
-      const tickets = await this.getTickets('demo'); // Use demo to get priorities
-      const priorities = Array.from(new Set(tickets.map(ticket => ticket.priority)));
-      return priorities;
-    } catch (error) {
-      console.error('Error getting ticket priorities:', error);
-      return ['low', 'medium', 'high', 'urgent'];
-    }
+    return ['low', 'medium', 'high', 'urgent'];
   }
 
   // Get support statistics
@@ -266,7 +251,13 @@ class SupportService {
       };
     } catch (error) {
       console.error('Error getting support stats:', error);
-      return this.getMockSupportStats();
+      return {
+        totalTickets: 0,
+        openTickets: 0,
+        resolvedTickets: 0,
+        averageResolutionTime: 0,
+        categoryBreakdown: []
+      };
     }
   }
 
@@ -280,7 +271,7 @@ class SupportService {
       const faqsSnapshot = await getDocs(faqsQuery);
       
       if (faqsSnapshot.empty) {
-        return this.getMockFAQs();
+        return [];
       }
 
       const faqs: FAQ[] = [];
@@ -301,157 +292,8 @@ class SupportService {
       return faqs;
     } catch (error) {
       console.error('Error getting FAQs:', error);
-      return this.getMockFAQs();
+      return [];
     }
-  }
-
-  // Mock data methods
-  private getMockTickets(instructorId: string): SupportTicket[] {
-    return [
-      {
-        id: '1',
-        title: 'Course upload issue',
-        description: 'I\'m having trouble uploading video files larger than 500MB. The upload keeps failing.',
-        category: 'technical',
-        priority: 'high',
-        status: 'open',
-        instructorId,
-        createdAt: new Date('2025-01-15'),
-        updatedAt: new Date('2025-01-15'),
-        tags: ['upload', 'video', 'file-size']
-      },
-      {
-        id: '2',
-        title: 'Payment processing delay',
-        description: 'My payout request from last week is still pending. When can I expect it to be processed?',
-        category: 'billing',
-        priority: 'medium',
-        status: 'in-progress',
-        instructorId,
-        createdAt: new Date('2025-01-10'),
-        updatedAt: new Date('2025-01-12'),
-        tags: ['payout', 'payment', 'delay']
-      },
-      {
-        id: '3',
-        title: 'Student enrollment notification',
-        description: 'I\'m not receiving email notifications when students enroll in my courses.',
-        category: 'course',
-        priority: 'low',
-        status: 'resolved',
-        instructorId,
-        createdAt: new Date('2025-01-05'),
-        updatedAt: new Date('2025-01-08'),
-        resolvedAt: new Date('2025-01-08'),
-        tags: ['notifications', 'email', 'enrollment']
-      },
-      {
-        id: '4',
-        title: 'Feature request: Bulk student messaging',
-        description: 'It would be great to have a feature to send messages to multiple students at once.',
-        category: 'feature-request',
-        priority: 'low',
-        status: 'open',
-        instructorId,
-        createdAt: new Date('2025-01-20'),
-        updatedAt: new Date('2025-01-20'),
-        tags: ['messaging', 'bulk', 'feature']
-      },
-      {
-        id: '5',
-        title: 'Analytics dashboard not loading',
-        description: 'The performance analytics page is taking too long to load and sometimes shows error messages.',
-        category: 'technical',
-        priority: 'medium',
-        status: 'open',
-        instructorId,
-        createdAt: new Date('2025-01-24'),
-        updatedAt: new Date('2025-01-24'),
-        tags: ['analytics', 'performance', 'loading']
-      },
-      {
-        id: '6',
-        title: 'Course certificate customization',
-        description: 'I want to customize the certificate template with my company logo and branding.',
-        category: 'course',
-        priority: 'low',
-        status: 'open',
-        instructorId,
-        createdAt: new Date('2025-01-23'),
-        updatedAt: new Date('2025-01-23'),
-        tags: ['certificate', 'customization', 'branding']
-      }
-    ];
-  }
-
-  private getMockFAQs(): FAQ[] {
-    return [
-      {
-        id: '1',
-        question: 'How do I upload course content?',
-        answer: 'To upload course content, go to your course dashboard, click on "Add Content", and use the file upload tool. Supported formats include MP4, PDF, and various image formats.',
-        category: 'Course Management',
-        tags: ['upload', 'content', 'course'],
-        helpfulCount: 45,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01')
-      },
-      {
-        id: '2',
-        question: 'What are the payment processing times?',
-        answer: 'Standard payout processing takes 3-5 business days. Express payouts (for premium members) are processed within 24 hours.',
-        category: 'Billing & Payments',
-        tags: ['payment', 'payout', 'processing'],
-        helpfulCount: 38,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01')
-      },
-      {
-        id: '3',
-        question: 'How can I track student progress?',
-        answer: 'Student progress is automatically tracked through our analytics dashboard. You can view detailed reports including completion rates, time spent, and assessment scores.',
-        category: 'Analytics',
-        tags: ['progress', 'tracking', 'analytics'],
-        helpfulCount: 32,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01')
-      },
-      {
-        id: '4',
-        question: 'What file formats are supported for videos?',
-        answer: 'We support MP4, MOV, AVI, and WebM formats. For best quality and compatibility, we recommend using MP4 with H.264 encoding.',
-        category: 'Technical',
-        tags: ['video', 'formats', 'encoding'],
-        helpfulCount: 28,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01')
-      },
-      {
-        id: '5',
-        question: 'How do I create a course certificate?',
-        answer: 'Course certificates are automatically generated when students complete 80% of the course content. You can customize the certificate template in your course settings.',
-        category: 'Course Management',
-        tags: ['certificate', 'completion', 'template'],
-        helpfulCount: 25,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01')
-      }
-    ];
-  }
-
-  private getMockSupportStats(): SupportStats {
-    return {
-      totalTickets: 4,
-      openTickets: 2,
-      resolvedTickets: 1,
-      averageResolutionTime: 2.5,
-      categoryBreakdown: [
-        { category: 'technical', count: 1, percentage: 25 },
-        { category: 'billing', count: 1, percentage: 25 },
-        { category: 'course', count: 1, percentage: 25 },
-        { category: 'feature-request', count: 1, percentage: 25 }
-      ]
-    };
   }
 }
 

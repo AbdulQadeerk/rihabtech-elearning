@@ -46,30 +46,38 @@ export const getVideoDuration = async (file: File): Promise<number> => {
   return new Promise((resolve) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
+    
+    // Create object URL
+    const objectUrl = URL.createObjectURL(file);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.remove();
+    };
 
     video.onloadedmetadata = () => {
       const duration = video.duration || 0;
       console.log('Video duration detected from file:', duration);
-      video.remove();
+      cleanup();
       resolve(duration);
     };
 
     video.onerror = (e) => {
       console.log('Failed to get video duration from file:', e);
-      video.remove();
+      cleanup();
       resolve(0);
     };
 
-    video.src = URL.createObjectURL(file);
+    video.src = objectUrl;
 
-    // Set a timeout in case the video doesn't load
+    // Set a timeout in case the video doesn't load (increased for bulk uploads)
     setTimeout(() => {
-      if (video.duration === undefined || isNaN(video.duration)) {
+      if (video.duration === undefined || isNaN(video.duration) || video.duration === 0) {
         console.log('Video duration timeout, using 0');
-        video.remove();
+        cleanup();
         resolve(0);
       }
-    }, 5000);
+    }, 15000); // Increased timeout to 15s to handle concurrent IO limits
   });
 };
 
@@ -169,6 +177,18 @@ export const uploadVideoToBunnyStream = async (
 
     const videoData: BunnyVideoResponse = await createResponse.json();
     console.log('[TUS] Video entry created:', videoData);
+
+    // Extract duration from local file before upload starts (most reliable for bulk uploads)
+    let duration = 0;
+    try {
+      duration = await getVideoDuration(file);
+    } catch (e) {
+      console.log('Could not get video duration from file:', e);
+    }
+    // Fallback to Bunny metadata if available at creation time
+    if (duration === 0 && videoData.length && videoData.length > 0) {
+      duration = videoData.length;
+    }
 
     // Step 2: Generate TUS authentication signature
     // Signature expires in 24 hours — plenty of time for large uploads
@@ -297,12 +317,28 @@ export const uploadVideoToBunnyStream = async (
       });
     });
 
-    // Get video duration from file
-    let duration = 0;
-    try {
-      duration = await getVideoDuration(file);
-    } catch (e) {
-      console.log('Could not get video duration:', e);
+    // After upload, try Bunny API length if local duration is still zero
+    if (duration === 0) {
+      try {
+        const statusResponse = await fetch(
+          `https://video.bunnycdn.com/library/${BUNNY_CONFIG.LIBRARY_ID}/videos/${videoData.guid}`,
+          {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'AccessKey': BUNNY_CONFIG.API_KEY,
+            },
+          }
+        );
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.length && statusData.length > 0) {
+            duration = statusData.length;
+          }
+        }
+      } catch (e) {
+        console.log('Could not fetch Bunny video length after upload:', e);
+      }
     }
 
     // Construct the playback URL
@@ -610,6 +646,34 @@ export const validateBunnyUrl = (url: string): boolean => {
     return false;
   }
   return isBunnyUrl(url);
+};
+
+/**
+ * Get video length in seconds from Bunny Stream
+ */
+export const getBunnyVideoLength = async (videoId: string): Promise<number> => {
+  if (!videoId) return 0;
+
+  try {
+    const response = await fetch(
+      `https://video.bunnycdn.com/library/${BUNNY_CONFIG.LIBRARY_ID}/videos/${videoId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'AccessKey': BUNNY_CONFIG.API_KEY,
+        },
+      }
+    );
+
+    if (!response.ok) return 0;
+
+    const videoData = await response.json();
+    return videoData.length && videoData.length > 0 ? videoData.length : 0;
+  } catch (error) {
+    console.error('Failed to get Bunny video length:', error);
+    return 0;
+  }
 };
 
 /**

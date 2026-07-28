@@ -59,30 +59,35 @@ const QuizPage: React.FC<QuizPageProps> = ({
   const quizStartTime = useRef<number | null>(null);
   const saveProgressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Default quiz data for fallback
-  const defaultQuizData: QuizData = {
-    quizTitle: "Knowledge Check: Research Basics",
-    quizDescription: "Test your understanding of basic UX research concepts. This quiz covers fundamental principles, methods, and best practices in user experience research.",
-    duration: 15,
-    questions: [
-      {
-        question: "What are the primary goals of UX research? (Select all that apply)",
-        options: [
-          "Understanding user needs and behaviors",
-          "Validating design decisions",
-          "Increasing conversion rates",
-          "Identifying usability issues",
-          "Reducing development costs"
-        ],
-        correctOption: [0, 1, 3],
-        type: 'multiple_choice'
-      }
-    ]
+  // Empty fallback used when no quiz data is provided (keeps the component safe
+  // to render while data loads or if the API returned nothing).
+  const emptyQuizData: QuizData = {
+    quizTitle: '',
+    quizDescription: '',
+    duration: 0,
+    questions: []
   };
 
-  // Use prop data or default data
-  const quizData = propQuizData || defaultQuizData;
-  
+  // Use prop data when available, otherwise fall back to an empty structure
+  const rawQuizData = propQuizData || emptyQuizData;
+
+  // Normalize questions so each has a valid `type`. The API doesn't always send
+  // a `type` field, so infer it from the shape of the question: if it has
+  // options + correctOption it's multiple choice, otherwise treat it as essay.
+  const quizData: QuizData = {
+    ...rawQuizData,
+    questions: (rawQuizData.questions || []).map((question) => {
+      const hasChoices =
+        Array.isArray(question.options) &&
+        question.options.length > 0 &&
+        Array.isArray(question.correctOption);
+      return {
+        ...question,
+        type: question.type || (hasChoices ? 'multiple_choice' : 'essay'),
+      };
+    }),
+  };
+
   console.log('QuizPage final quizData:', quizData);
 
   // Quiz state
@@ -620,9 +625,10 @@ const QuizPage: React.FC<QuizPageProps> = ({
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-start justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-800 pr-4">
-                  {currentQuestion.question}
-                </h2>
+                <div
+                  className="text-lg font-semibold text-gray-800 pr-4 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_p]:my-1"
+                  dangerouslySetInnerHTML={{ __html: currentQuestion.question }}
+                />
                 <button
                   onClick={() => toggleFlag(currentQuestionIndex)}
                   className={`p-2 rounded-full transition-colors ${
@@ -667,7 +673,10 @@ const QuizPage: React.FC<QuizPageProps> = ({
                           className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
                         />
                       )}
-                      <span className="text-gray-700">{option}</span>
+                      <span
+                        className="text-gray-700 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_p]:my-0"
+                        dangerouslySetInnerHTML={{ __html: option }}
+                      />
                     </label>
                   )})
                 ) : (
