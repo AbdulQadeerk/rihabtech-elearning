@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 // @ts-ignore
 import ReactQuill from 'react-quill-new';
 // @ts-ignore
@@ -12,6 +12,25 @@ interface RichTextEditorProps {
   height?: string;
 }
 
+const modules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
+    [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+    [{ 'align': [] }],
+    [{ 'color': [] }, { 'background': [] }],
+    ['link', 'image', 'video'],
+    ['clean']
+  ],
+};
+
+const formats = [
+  'header',
+  'bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block',
+  'list', 'bullet', 'indent',
+  'link', 'image', 'video', 'align', 'color', 'background'
+];
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
@@ -19,26 +38,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   className = "",
   height = "200px"
 }) => {
-  // Memoize modules to prevent Quill from constantly re-rendering/losing focus
-  const modules = useMemo(() => ({
-    toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
-      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-      [{ 'align': [] }],
-      [{ 'color': [] }, { 'background': [] }],
-      ['link', 'image', 'video'],
-      ['clean']
-    ],
-  }), []);
-
-  const formats = [
-    'header',
-    'bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block',
-    'list', 'bullet', 'indent',
-    'link', 'image', 'video', 'align', 'color', 'background'
-  ];
-
   return (
     <div className={`rich-text-editor-container ${className}`} style={{ minHeight: height }}>
       <ReactQuill 
@@ -82,6 +81,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         .rich-text-editor-container .ql-editor img {
            max-width: 100%;
            height: auto;
+        }
+        /* Prevent browser scroll jump to hidden clipboard container during paste/focus */
+        .rich-text-editor-container .ql-clipboard {
+           position: fixed;
+           opacity: 0;
+           left: 50%;
+           top: 50%;
+           width: 1px;
+           height: 1px;
+           overflow: hidden;
         }
       `}</style>
     </div>
