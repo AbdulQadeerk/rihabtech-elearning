@@ -91,7 +91,7 @@ class RazorpayService {
   private razorpayConfig: ConfigRazorpayConfig | null = null;
   private paymentDataCache: Map<string, { subscriptionId: string; paymentData: SubscriptionPaymentData; razorpayOrderId?: string }> = new Map(); // transactionId -> {subscriptionId, paymentData, razorpayOrderId}
 
-  // Fetch Razorpay configuration from Firebase
+  // Fetch Razorpay configuration from API
   private async getRazorpayConfig(): Promise<ConfigRazorpayConfig> {
     if (this.razorpayConfig) {
       return this.razorpayConfig;
@@ -332,7 +332,7 @@ class RazorpayService {
     }
   }
 
-  // All Firebase-related methods have been removed as they are now handled by the API
+  // All payment methods are handled by the API via subscriptionApiService
 }
 
 export const razorpayService = new RazorpayService();

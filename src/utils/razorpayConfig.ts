@@ -1,8 +1,6 @@
-import { Timestamp } from 'firebase/firestore';
-
 export interface RazorpayConfig {
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   currency: string;
   description: string;
   isTestMode: boolean;

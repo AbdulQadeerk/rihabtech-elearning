@@ -3,11 +3,10 @@ import { API_BASE_URL } from '../lib/api';
 
 export interface PricingPlan {
   id: string;
-  firebaseId?: string; // Firebase document ID
   name: string;
   description: string;
   longDescription?: string; // CKEditor content
-  duration: number | string; // in months, can be string from Firebase
+  duration: number | string; // in months
   durationText: string; // e.g., "1 Month", "6 Months", "1 Year"
   basePrice: number;
   totalAmount?: number; // Total amount including tax
@@ -26,7 +25,7 @@ export interface PricingPlan {
   premiumFeatures: boolean; // For annual plans
   earlyAccess: boolean; // For annual plans
   isOneTimeUsePerUser?: boolean; // User can subscribe to this plan only once
-  gstRate?: number | string; // GST percentage, can be string from Firebase
+  gstRate?: number | string; // GST percentage
   
   createdAt?: Date;
   updatedAt?: Date;

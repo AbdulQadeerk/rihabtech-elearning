@@ -1,15 +1,5 @@
-import { db } from '../lib/firebase';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  getDoc, 
-  query, 
-  where, 
-  getDocs,
-  serverTimestamp 
-} from 'firebase/firestore';
+import apiClient from './axiosInterceptor';
+import { API_BASE_URL } from '../lib/api';
 
 export interface PaymentIntent {
   id: string;
@@ -55,7 +45,7 @@ export interface CourseEnrollment {
   orderId?: string;
 }
 
-// Create a new payment intent
+// Create a new payment intent (tracked locally — actual payment goes through Razorpay)
 export const createPaymentIntent = async (
   courseId: string, 
   userId: string, 
@@ -64,20 +54,9 @@ export const createPaymentIntent = async (
   courseName: string
 ): Promise<string> => {
   try {
-    const paymentData = {
-      courseId,
-      userId,
-      userEmail,
-      amount,
-      currency: 'inr',
-      status: 'pending',
-      courseName,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    const docRef = await addDoc(collection(db, 'paymentIntents'), paymentData);
-    return docRef.id;
+    const paymentIntentId = `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Payment intent created:', paymentIntentId);
+    return paymentIntentId;
   } catch (error) {
     console.error('Error creating payment intent:', error);
     throw new Error('Failed to create payment intent');
@@ -91,24 +70,14 @@ export const updatePaymentIntentStatus = async (
   stripeSessionId?: string
 ): Promise<void> => {
   try {
-    const paymentRef = doc(db, 'paymentIntents', paymentIntentId);
-    const updateData: any = {
-      status,
-      updatedAt: serverTimestamp(),
-    };
-    
-    if (stripeSessionId) {
-      updateData.stripeSessionId = stripeSessionId;
-    }
-
-    await updateDoc(paymentRef, updateData);
+    console.log('Payment intent status updated:', paymentIntentId, status);
   } catch (error) {
     console.error('Error updating payment intent:', error);
     throw new Error('Failed to update payment intent');
   }
 };
 
-// Create an order
+// Create an order (tracked locally — actual order is managed via subscription API)
 export const createOrder = async (
   courseId: string,
   userId: string,
@@ -118,21 +87,9 @@ export const createOrder = async (
   paymentIntentId?: string
 ): Promise<string> => {
   try {
-    const orderData = {
-      courseId,
-      userId,
-      userEmail,
-      courseName,
-      amount,
-      currency: 'inr',
-      status: 'pending',
-      paymentIntentId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    const docRef = await addDoc(collection(db, 'orders'), orderData);
-    return docRef.id;
+    const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Order created:', orderId);
+    return orderId;
   } catch (error) {
     console.error('Error creating order:', error);
     throw new Error('Failed to create order');
@@ -146,28 +103,14 @@ export const updateOrderStatus = async (
   stripeSessionId?: string
 ): Promise<void> => {
   try {
-    const orderRef = doc(db, 'orders', orderId);
-    const updateData: any = {
-      status,
-      updatedAt: serverTimestamp(),
-    };
-
-    if (stripeSessionId) {
-      updateData.stripeSessionId = stripeSessionId;
-    }
-
-    if (status === 'completed') {
-      updateData.enrollmentDate = serverTimestamp();
-    }
-
-    await updateDoc(orderRef, updateData);
+    console.log('Order status updated:', orderId, status);
   } catch (error) {
     console.error('Error updating order:', error);
     throw new Error('Failed to update order');
   }
 };
 
-// Enroll user in course
+// Enroll user in course via API
 export const enrollUserInCourse = async (
   courseId: string,
   studentId: string,
@@ -176,101 +119,47 @@ export const enrollUserInCourse = async (
   paymentStatus: 'free' | 'paid' = 'paid'
 ): Promise<string> => {
   try {
-    // Check if user is already enrolled
-    const enrollmentsRef = collection(db, 'studentEnrollments');
-    const existingEnrollmentQuery = query(
-      enrollmentsRef,
-      where('courseId', '==', courseId),
-      where('studentId', '==', studentId)
-    );
+    const response = await apiClient.post(`${API_BASE_URL}enrollment/enroll`, {
+      courseId: parseInt(courseId) || 0
+    });
+
+    const enrollmentId = response.data?.enrollmentId?.toString() || 
+                         response.data?.id?.toString() || 
+                         `enr_${Date.now()}`;
     
-    const existingEnrollments = await getDocs(existingEnrollmentQuery);
-    
-    if (!existingEnrollments.empty) {
+    return enrollmentId;
+  } catch (error: any) {
+    console.error('Error enrolling user:', error);
+    const message = error?.response?.data?.message || error?.response?.data || error?.message;
+    if (typeof message === 'string' && message.includes('already enrolled')) {
       throw new Error('User is already enrolled in this course');
     }
-
-    const enrollmentData = {
-      courseId,
-      studentId:studentId,
-      userEmail:userEmail,
-      enrolledAt: serverTimestamp(),
-      progress: 0,
-      status: 'active',
-      paymentStatus,
-      //orderId,
-    };
-
-    const docRef = await addDoc(enrollmentsRef, enrollmentData);
-    
-    // Update course member count
-    await updateCourseMemberCount(courseId, studentId, userEmail);
-    
-    return docRef.id;
-  } catch (error) {
-    console.error('Error enrolling user:', error);
     throw error;
   }
 };
 
-// Update course member count
-const updateCourseMemberCount = async (
-  courseId: string, 
-  userId: string, 
-  userEmail: string
-): Promise<void> => {
-  try {
-    const courseRef = doc(db, 'courseDrafts', courseId);
-    const courseSnap = await getDoc(courseRef);
-    
-    if (courseSnap.exists()) {
-      const courseData = courseSnap.data() as any;
-      const currentMembers = courseData?.members || [];
-      
-      // Check if user is already a member
-      const isAlreadyMember = currentMembers.some((member: any) => 
-        member.email === userEmail || member.id === userId
-      );
-      
-      if (!isAlreadyMember) {
-        const newMember = {
-          id: userId,
-          email: userEmail,
-          role: 'student',
-          joinedAt: new Date().toISOString(),
-        };
-        
-        await updateDoc(courseRef, {
-          members: [...currentMembers, newMember],
-          students: (courseData?.students || 0) + 1,
-          updatedAt: serverTimestamp(),
-        });
-      }
-    }
-  } catch (error) {
-    console.error('Error updating course members:', error);
-    // Don't throw error here as enrollment is more important
-  }
-};
-
-// Get user's orders
+// Get user's orders via API (uses payment transactions endpoint)
 export const getUserOrders = async (userId: string): Promise<Order[]> => {
   try {
-    const ordersRef = collection(db, 'orders');
-    const userOrdersQuery = query(ordersRef, where('userId', '==', userId));
-    const querySnapshot = await getDocs(userOrdersQuery);
-    
-    const orders: Order[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data() as any;
-      orders.push({
-        id: doc.id,
-        ...data,
-        createdAt: data?.createdAt?.toDate() || new Date(),
-        updatedAt: data?.updatedAt?.toDate() || new Date(),
-        enrollmentDate: data?.enrollmentDate?.toDate(),
-      } as Order);
-    });
+    const response = await apiClient.get(`${API_BASE_URL}Subscription/my-payment-transactions`);
+    const transactions = response.data || [];
+
+    const orders: Order[] = transactions.map((txn: any) => ({
+      id: txn.id?.toString() || '',
+      courseId: txn.planId?.toString() || '',
+      userId: txn.userId || userId,
+      userEmail: txn.userEmail || '',
+      courseName: txn.planName || '',
+      amount: txn.totalAmount || 0,
+      currency: txn.currency || 'INR',
+      status: (txn.status?.toLowerCase() || 'pending') as Order['status'],
+      paymentIntentId: txn.razorpayPaymentId,
+      createdAt: txn.createdAt ? new Date(txn.createdAt) : new Date(),
+      updatedAt: txn.createdAt ? new Date(txn.createdAt) : new Date(),
+      enrollmentDate: txn.status?.toLowerCase() === 'completed' 
+        ? (txn.createdAt ? new Date(txn.createdAt) : new Date()) 
+        : undefined
+    }));
     
     return orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   } catch (error) {
@@ -279,22 +168,23 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
   }
 };
 
-// Get user's enrollments
+// Get user's enrollments via API
 export const getUserEnrollments = async (userId: string): Promise<CourseEnrollment[]> => {
   try {
-    const enrollmentsRef = collection(db, 'studentEnrollments');
-    const userEnrollmentsQuery = query(enrollmentsRef, where('studentId', '==', userId));
-    const querySnapshot = await getDocs(userEnrollmentsQuery);
-    
-    const enrollments: CourseEnrollment[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data() as any;
-      enrollments.push({
-        id: doc.id,
-        ...data,
-        enrolledAt: data?.enrolledAt?.toDate() || new Date(),
-      } as CourseEnrollment);
-    });
+    const response = await apiClient.get(`${API_BASE_URL}enrollment/my-enrollments`);
+    const enrollmentsData = response.data || [];
+
+    const enrollments: CourseEnrollment[] = enrollmentsData.map((data: any) => ({
+      id: data.id?.toString() || '',
+      courseId: data.courseId?.toString() || '',
+      userId: data.userId?.toString() || userId,
+      userEmail: data.userEmail || '',
+      enrolledAt: data.enrolledAt ? new Date(data.enrolledAt) : new Date(),
+      progress: data.progress || 0,
+      status: (data.status || 'active') as CourseEnrollment['status'],
+      paymentStatus: data.paymentStatus || 'paid',
+      orderId: data.orderId
+    }));
     
     return enrollments;
   } catch (error) {
@@ -309,10 +199,8 @@ export const isUserEnrolledInCourse = async (
   userId: string
 ): Promise<boolean> => {
   try {
-    const enrollments = await getUserEnrollments(userId);
-    return enrollments.some(enrollment => 
-      enrollment.courseId === courseId && enrollment.status === 'active'
-    );
+    const response = await apiClient.get(`${API_BASE_URL}enrollment/check/${courseId}`);
+    return response.data?.isEnrolled === true || response.data === true;
   } catch (error) {
     console.error('Error checking enrollment:', error);
     return false;
@@ -327,18 +215,11 @@ export const enrollInFreeCourse = async (
   courseName: string
 ): Promise<string> => {
   try {
-    // Create order for record keeping
-    const orderId = await createOrder(courseId, userId, userEmail, courseName, 0);
-    
-    // Update order status to completed
-    await updateOrderStatus(orderId, 'completed');
-    
-    // Enroll user
-    const enrollmentId = await enrollUserInCourse(courseId, userId, userEmail, orderId, 'free');
-    
+    const enrollmentId = await enrollUserInCourse(courseId, userId, userEmail, undefined, 'free');
     return enrollmentId;
   } catch (error) {
     console.error('Error enrolling in free course:', error);
     throw error;
   }
 };
+

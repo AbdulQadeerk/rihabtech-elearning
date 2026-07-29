@@ -1,6 +1,6 @@
 import { fetchPublicSettings } from '../lib/configService';
-import { db } from '../lib/firebase';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import apiClient from './axiosInterceptor';
+import { API_BASE_URL } from '../lib/api';
 
 export interface RazorpayConfig {
   keyId: string;
@@ -181,7 +181,7 @@ class ConfigService {
     }
   }
 
-  // Get email settings from Firebase
+  // Get email settings from API
   async getEmailSettings(): Promise<EmailSettings> {
     try {
       // Check cache first
@@ -189,34 +189,33 @@ class ConfigService {
         return this.emailSettingsCache;
       }
 
-      // Fetch from Firebase
-      const settingsQuery = query(
-        collection(db, 'emailSettings'),
-        orderBy('updatedAt', 'desc'),
-        limit(1)
-      );
+      // Fetch from .NET API
+      const response = await apiClient.get(`${API_BASE_URL}admin/EmailSettings/get-all`);
+      const settingsData = response.data;
 
-      const settingsSnapshot = await getDocs(settingsQuery);
-
-      if (settingsSnapshot.empty) {
+      if (!settingsData || (Array.isArray(settingsData) && settingsData.length === 0)) {
         throw new Error('No email settings found');
       }
 
-      const settingsDoc = settingsSnapshot.docs[0];
-      const settingsData = settingsDoc.data() as EmailSettingsData;
+      // Get the first (active) email setting
+      const setting = Array.isArray(settingsData) ? settingsData[0] : settingsData;
 
       const settings: EmailSettings = {
-        provider: settingsData.provider || 'smtp',
-        smtp: settingsData.smtp,
-        gmail: settingsData.gmail,
-        outlook: settingsData.outlook,
-        sendgrid: settingsData.sendgrid,
-        mailgun: settingsData.mailgun,
-        from: settingsData.from || {
-          name: 'Rihab Technologies',
-          email: 'connect@zktutorials.com'
+        provider: 'smtp',
+        smtp: {
+          host: setting.outgoingMailServer || 'smtp.gmail.com',
+          port: setting.smtpPort || 587,
+          secure: (setting.smtpPort === 465),
+          auth: {
+            user: setting.sendEmailAddress || '',
+            pass: setting.password || ''
+          }
         },
-        replyTo: settingsData.replyTo
+        from: {
+          name: setting.displayName || 'Rihab Technologies',
+          email: setting.sendEmailAddress || 'connect@zktutorials.com'
+        },
+        replyTo: setting.receiverEmailAddress
       };
 
       // Cache the settings
@@ -247,7 +246,7 @@ class ConfigService {
     }
   }
 
-  // Get email templates from Firebase
+  // Get email templates from API
   async getEmailTemplates(): Promise<EmailTemplate[]> {
     try {
       // Check cache first
@@ -255,28 +254,26 @@ class ConfigService {
         return this.emailTemplatesCache;
       }
 
-      // Fetch from Firebase
-      const templatesQuery = query(
-        collection(db, 'emailTemplates'),
-        where('isActive', '==', true),
-        orderBy('updatedAt', 'desc')
-      );
+      // Fetch from .NET API
+      const response = await apiClient.post(`${API_BASE_URL}admin/email-template/get/all`, {});
+      const templatesData = response.data;
 
-      const templatesSnapshot = await getDocs(templatesQuery);
+      if (!templatesData || !Array.isArray(templatesData)) {
+        return [];
+      }
 
-      const templates: EmailTemplate[] = templatesSnapshot.docs.map((doc: any) => {
-        const data = doc.data() as EmailTemplateData;
+      const templates: EmailTemplate[] = templatesData.map((data: any) => {
         return {
-          id: doc.id,
-          name: data.name,
-          subject: data.subject,
-          htmlContent: data.htmlContent,
-          textContent: data.textContent,
+          id: data.id?.toString() || '',
+          name: data.name || '',
+          subject: data.subject || '',
+          htmlContent: data.htmlContent || data.body || '',
+          textContent: data.textContent || '',
           variables: data.variables || [],
-          type: data.type,
-          isActive: data.isActive,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date()
+          type: data.type || data.templateType || 'payment_confirmation',
+          isActive: data.isActive !== false && data.bDeleted !== true,
+          createdAt: data.createdDate ? new Date(data.createdDate) : new Date(),
+          updatedAt: data.modifiedDate ? new Date(data.modifiedDate) : new Date()
         };
       });
 
