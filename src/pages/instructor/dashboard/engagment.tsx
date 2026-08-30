@@ -23,13 +23,33 @@ const PERIODS: { value: EngagementPeriod; label: string }[] = [
   { value: "12m+", label: "Last 12+ months" },
 ];
 
+const MONTHS = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
 export const Engagment = () => {
+  const now = new Date();
   const [report, setReport] = useState<CourseEngagementReport | null>(null);
   const [courses, setCourses] = useState<EngagementCourseOption[]>([]);
-  const [period, setPeriod] = useState<EngagementPeriod>("12m");
+  const [period, setPeriod] = useState<EngagementPeriod | "month">("month");
   const [courseId, setCourseId] = useState<string>("all");
+  const [month, setMonth] = useState<string>(String(now.getMonth() + 1));
+  const [year, setYear] = useState<string>(String(now.getFullYear()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const years = Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i));
 
   const loadCourses = async () => {
     try {
@@ -45,7 +65,13 @@ export const Engagment = () => {
       setLoading(true);
       setError(null);
       const selectedCourseId = courseId === "all" ? null : Number(courseId);
-      const data = await courseEngagementService.getReport(period, selectedCourseId);
+      const useMonth = period === "month";
+      const data = await courseEngagementService.getReport(
+        useMonth ? "month" : period,
+        selectedCourseId,
+        useMonth ? Number(year) : null,
+        useMonth ? Number(month) : null
+      );
       setReport(data);
     } catch (err: any) {
       console.error("Failed to load engagement report", err);
@@ -62,16 +88,19 @@ export const Engagment = () => {
 
   useEffect(() => {
     loadReport();
-  }, [period, courseId]);
+  }, [period, courseId, month, year]);
 
   const chartData = (report?.series || []).map((point) => ({
     label: point.label,
     minutes: Math.round(point.minutesTaught),
   }));
 
+  const selectedMonthLabel =
+    MONTHS.find((m) => m.value === month)?.label || month;
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2">
+      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2 flex-wrap">
         <h1 className="form-title mr-2">Course engagement</h1>
         <Select value={courseId} onValueChange={setCourseId}>
           <SelectTrigger className="rounded-none text-primary border border-primary w-full md:w-[240px]">
@@ -86,11 +115,15 @@ export const Engagment = () => {
             ))}
           </SelectContent>
         </Select>
-        <Select value={period} onValueChange={(v) => setPeriod(v as EngagementPeriod)}>
+        <Select
+          value={period}
+          onValueChange={(v) => setPeriod(v as EngagementPeriod | "month")}
+        >
           <SelectTrigger className="rounded-none text-primary border border-primary w-full md:w-[180px]">
             <SelectValue placeholder="Period" />
           </SelectTrigger>
           <SelectContent className="bg-white">
+            <SelectItem value="month">Specific month</SelectItem>
             {PERIODS.map((p) => (
               <SelectItem key={p.value} value={p.value}>
                 {p.label}
@@ -98,6 +131,34 @@ export const Engagment = () => {
             ))}
           </SelectContent>
         </Select>
+        {period === "month" && (
+          <>
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger className="rounded-none text-primary border border-primary w-full md:w-[160px]">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                {MONTHS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="rounded-none text-primary border border-primary w-full md:w-[120px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                {years.map((y) => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
         <Button
           onClick={loadReport}
           disabled={loading}
@@ -108,7 +169,10 @@ export const Engagment = () => {
         </Button>
       </div>
 
-      <p className="text-sm text-gray-600">Minutes consumed by active learners</p>
+      <p className="text-sm text-gray-600">
+        Minutes consumed by active learners
+        {period === "month" ? ` · ${selectedMonthLabel} ${year}` : ""}
+      </p>
 
       {loading && (
         <div className="flex items-center justify-center h-64">

@@ -44,10 +44,21 @@ export interface EngagementCourseOption {
 }
 
 class CourseEngagementService {
-  async getReport(period: EngagementPeriod = '12m', courseId?: number | null): Promise<CourseEngagementReport> {
+  async getReport(
+    period: EngagementPeriod | string = '12m',
+    courseId?: number | null,
+    year?: number | null,
+    month?: number | null
+  ): Promise<CourseEngagementReport> {
     const params: Record<string, string | number> = { period };
     if (courseId) {
       params.courseId = courseId;
+    }
+    if (year) {
+      params.year = year;
+    }
+    if (month) {
+      params.month = month;
     }
     return apiService.get<CourseEngagementReport>(
       `${API_BASE_URL}instructor/dashboard/engagement`,
