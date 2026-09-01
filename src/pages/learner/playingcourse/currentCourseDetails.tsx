@@ -983,43 +983,14 @@ export default function CourseDetailsPage() {
                 isCompleted: false
               });
 
-              // Record incremental watch time for instructor payout (only for paid courses)
-              // Record any watch time > 0 seconds (removed 30-second threshold to capture all watch time, including short videos)
-              const isPaidCourse = courseData?.pricing && courseData.pricing.toLowerCase() !== 'free';
-
-              console.log('🔍 Watch Time Recording Check:', {
-                incrementalWatchTime,
-                coursePricing: courseData?.pricing,
-                isFree: courseData?.pricing?.toLowerCase() === 'free',
-                isPaidCourse,
-                courseId: courseIdNum,
-                lectureId: lectureId,
-                totalWatched,
-                lastPayoutWatchTime: lastPayoutWatchTimeRef.current,
-                shouldRecord: incrementalWatchTime > 0 && isPaidCourse
-              });
-
-              // Record watch time if there's any incremental watch time and course is paid
-              if (incrementalWatchTime > 0 && isPaidCourse) {
+              // Record incremental watch time for minute categorization and instructor payout
+              if (incrementalWatchTime > 0) {
                 try {
-                  console.log('✅ Recording watch time for payout:', {
-                    courseId: courseIdNum,
-                    lectureId: lectureId,
-                    watchTimeSeconds: incrementalWatchTime
-                  });
                   await instructorPayoutApiService.recordWatchTime(courseIdNum, lectureId, incrementalWatchTime);
-                  lastPayoutWatchTimeRef.current = totalWatched; // Update last recorded watch time for payout
-                  console.log('✅ Watch time recorded successfully');
+                  lastPayoutWatchTimeRef.current = totalWatched; // Update last recorded watch time
                 } catch (watchTimeError) {
-                  // Don't fail the progress update if watch time recording fails
-                  console.error('❌ Error recording watch time for payout:', watchTimeError);
+                  console.error('Error recording watch time:', watchTimeError);
                 }
-              } else {
-                console.log('⏭️ Skipping watch time recording:', {
-                  reason: incrementalWatchTime <= 0 ? 'No incremental watch time' :
-                    !courseData?.pricing ? 'No pricing data' :
-                      courseData.pricing.toLowerCase() === 'free' ? 'Course is free' : 'Unknown reason'
-                });
               }
 
               // After updating lecture progress, refresh overall progress to ensure it's up to date
@@ -1154,59 +1125,23 @@ export default function CourseDetailsPage() {
             isCompleted: true
           });
 
-          // Record final incremental watch time for instructor payout (only for paid courses)
+          // Record final incremental watch time for minute categorization and instructor payout
           // Always record any remaining watch time when video ends, even if less than 30 seconds
           // Use the actual video duration or totalWatched, whichever is higher
           const finalWatchTime = Math.max(totalWatched, duration || 0);
           const finalIncrementalWatchTime = Math.floor(finalWatchTime - lastPayoutWatchTimeRef.current);
 
-          // Get course pricing from courseData or enrichedCourseData
-          const currentCourseData = courseData || enrichedCourseData;
-          const coursePricing = currentCourseData?.pricing;
-          const isPaidCourse = coursePricing && coursePricing.toLowerCase() !== 'free';
-
-          console.log('🔍 Final Watch Time Recording Check (on video end):', {
-            finalIncrementalWatchTime,
-            totalWatched,
-            duration,
-            finalWatchTime,
-            coursePricing: coursePricing,
-            isFree: coursePricing?.toLowerCase() === 'free',
-            isPaidCourse,
-            courseId: courseIdNum,
-            lectureId: lectureId,
-            lastPayoutWatchTime: lastPayoutWatchTimeRef.current,
-            shouldRecord: finalIncrementalWatchTime > 0 && isPaidCourse,
-            courseDataExists: !!courseData,
-            enrichedCourseDataExists: !!enrichedCourseData
-          });
-
           // Record any remaining watch time when video ends (no minimum threshold)
           // For very short videos, record the full duration if no incremental time was recorded
           const watchTimeToRecord = finalIncrementalWatchTime > 0 ? finalIncrementalWatchTime : Math.floor(finalWatchTime);
 
-          if (watchTimeToRecord > 0 && isPaidCourse) {
+          if (watchTimeToRecord > 0) {
             try {
-              console.log('✅ Recording final watch time for payout:', {
-                courseId: courseIdNum,
-                lectureId: lectureId,
-                watchTimeSeconds: watchTimeToRecord,
-                source: finalIncrementalWatchTime > 0 ? 'incremental' : 'full duration'
-              });
               await instructorPayoutApiService.recordWatchTime(courseIdNum, lectureId, watchTimeToRecord);
               lastPayoutWatchTimeRef.current = finalWatchTime; // Update last recorded watch time
-              console.log('✅ Final watch time recorded successfully');
             } catch (watchTimeError) {
-              console.error('❌ Error recording final watch time for payout:', watchTimeError);
+              console.error('Error recording final watch time:', watchTimeError);
             }
-          } else {
-            console.log('⏭️ Skipping final watch time recording:', {
-              reason: watchTimeToRecord <= 0 ? 'No watch time to record' :
-                !coursePricing ? 'No pricing data' :
-                  coursePricing.toLowerCase() === 'free' ? 'Course is free' : 'Unknown reason',
-              watchTimeToRecord,
-              isPaidCourse
-            });
           }
 
           // Get section and item seqNo for progress update

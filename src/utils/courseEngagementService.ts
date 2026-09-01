@@ -2,11 +2,14 @@ import apiService from './apiService';
 import { API_BASE_URL } from '../lib/api';
 
 export type EngagementPeriod = '7d' | '30d' | '12m' | '12m+';
+export type EngagementMinuteType = 'all' | 'paid' | 'free_preview';
 
 export interface EngagementSeriesPoint {
   label: string;
   periodKey: string;
   minutesTaught: number;
+  paidMinutes?: number;
+  freePreviewMinutes?: number;
   activeLearners: number;
 }
 
@@ -18,13 +21,22 @@ export interface EngagementCourseRow {
   isPublished: boolean;
   status: number;
   minutesTaught: number;
+  paidMinutes?: number;
+  freePreviewMinutes?: number;
   activeLearners: number;
+  paidActiveLearners?: number;
+  freePreviewActiveLearners?: number;
   minutesPerActiveLearner: number;
 }
 
 export interface CourseEngagementReport {
   totalMinutesTaught: number;
+  paidMinutesTaught?: number;
+  freePreviewMinutesTaught?: number;
   activeLearners: number;
+  paidActiveLearners?: number;
+  freePreviewActiveLearners?: number;
+  minuteType?: EngagementMinuteType | string;
   period: string;
   fromDate: string;
   toDate: string;
@@ -48,9 +60,10 @@ class CourseEngagementService {
     period: EngagementPeriod | string = '12m',
     courseId?: number | null,
     year?: number | null,
-    month?: number | null
+    month?: number | null,
+    minuteType: EngagementMinuteType | string = 'all'
   ): Promise<CourseEngagementReport> {
-    const params: Record<string, string | number> = { period };
+    const params: Record<string, string | number> = { period, minuteType };
     if (courseId) {
       params.courseId = courseId;
     }

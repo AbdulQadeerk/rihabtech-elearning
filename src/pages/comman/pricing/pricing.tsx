@@ -306,7 +306,7 @@ export default function Pricing() {
                         className="mt-2 bg-primary border border-4 border-[#EFF0FF] text-white py-3 px-6 rounded-full font-medium hover:shadow-lg transition duration-300"
                         onClick={() => handleStartSubscription(plan)}
                       >
-                        Start Subscription
+                        Enroll
                       </button>
                     ) : (
                       <button
