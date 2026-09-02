@@ -1,5 +1,5 @@
-import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import apiService from './apiService';
+import { API_BASE_URL } from '../lib/api';
 
 export interface CourseAnalyticsData {
   courseId: string;
@@ -33,263 +33,183 @@ export interface CourseRevenueItem {
   studentCount: number;
 }
 
-class CourseAnalyticsService {
-  private PAYOUT_REQUESTS_COLLECTION = 'payoutRequests';
-  private STUDENT_ENROLLMENTS_COLLECTION = 'studentEnrollments';
-  private WATCH_TIME_DATA_COLLECTION = 'watchTimeData';
-  private COURSES_COLLECTION = 'courseDrafts';
-  private USERS_COLLECTION = 'users';
+const PALETTE = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1', '#14B8A6'];
 
+class CourseAnalyticsService {
   async getCourseAnalytics(instructorId: string): Promise<CourseAnalyticsData[]> {
     try {
-      console.log('Fetching course analytics for instructor:', instructorId);
-      
-      // Get instructor's courses
-      const coursesQuery = query(
-        collection(db, this.COURSES_COLLECTION),
-        where('instructorId', '==', instructorId)
-      );
-      const coursesSnapshot = await getDocs(coursesQuery);
-      
-      console.log(`Found ${coursesSnapshot.docs.length} courses for instructor ${instructorId}`);
-      
-      const courseAnalytics: CourseAnalyticsData[] = [];
-      
-      for (const courseDoc of coursesSnapshot.docs) {
-        const courseData = courseDoc.data() as any;
-        const courseId = courseDoc.id;
+      console.log('Fetching dynamic course analytics for instructor:', instructorId);
+
+      const [coursesRes, earningsRes, sharesRes, statsRes] = await Promise.allSettled([
+        apiService.get<any[]>(`${API_BASE_URL}instructor/dashboard/course-watch-time`),
+        apiService.get<any[]>(`${API_BASE_URL}instructor-payout/earnings`),
+        apiService.get<any[]>(`${API_BASE_URL}instructor-payout/revenue-shares`),
+        apiService.get<any>(`${API_BASE_URL}instructor/dashboard/stats`)
+      ]);
+
+      const courses = coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : [];
+      const earnings = earningsRes.status === 'fulfilled' && Array.isArray(earningsRes.value) ? earningsRes.value : [];
+      const shares = sharesRes.status === 'fulfilled' && Array.isArray(sharesRes.value) ? sharesRes.value : [];
+      const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
+
+      // 1. Resolve total net earnings
+      const earningsTotal = earnings.reduce((sum, e) => sum + (e.earnings || e.instructorShare || 0), 0);
+      const sharesTotal = shares.reduce((sum, s) => sum + (s.instructorShare || 0), 0);
+      const totalNetEarnings = earningsTotal > 0 
+        ? earningsTotal 
+        : sharesTotal > 0 
+        ? sharesTotal 
+        : (stats?.totalRevenue || 0);
+
+      // 2. Resolve platform fee and tax totals
+      const totalPlatformFee = shares.reduce((sum, s) => sum + (s.platformFee || 0), 0);
+      const totalTaxAmount = shares.reduce((sum, s) => sum + (s.taxAmount || 0), 0);
+      const totalGrossRevenue = totalNetEarnings + totalPlatformFee + totalTaxAmount;
+
+      const totalWatchMinutesAll = courses.reduce((sum, c) => sum + (c.totalWatchTime || 0), 0);
+
+      const courseAnalytics: CourseAnalyticsData[] = courses.map(course => {
+        const cWatch = course.totalWatchTime || 0;
+        const ratio = totalWatchMinutesAll > 0 ? cWatch / totalWatchMinutesAll : 0;
         
-        // Get revenue data for this course
-        const revenueQuery = query(
-          collection(db, this.PAYOUT_REQUESTS_COLLECTION),
-          where('instructorId', '==', instructorId),
-          where('courseId', '==', courseId)
-        );
-        const revenueSnapshot = await getDocs(revenueQuery);
-        
-        // Calculate totals
-        let totalRevenue = 0;
-        let platformFee = 0;
-        let taxAmount = 0;
-        let netEarning = 0;
-        let totalWatchTime = 0;
-        
-        for (const revenueDoc of revenueSnapshot.docs) {
-          const revenueData = revenueDoc.data() as any;
-          totalRevenue += revenueData.amount || 0;
-          platformFee += revenueData.platformFee || 0;
-          taxAmount += revenueData.taxAmount || 0;
-          netEarning += revenueData.instructorShare || 0;
-          totalWatchTime += revenueData.watchTimeMinutes || 0;
-        }
-        
-        // Get enrollment data
-        const enrollmentQuery = query(
-          collection(db, this.STUDENT_ENROLLMENTS_COLLECTION),
-          where('courseId', '==', courseId)
-        );
-        const enrollmentSnapshot = await getDocs(enrollmentQuery);
-        const enrollmentCount = enrollmentSnapshot.docs.length;
-        
-        // Get watch time data
-        const watchTimeQuery = query(
-          collection(db, this.WATCH_TIME_DATA_COLLECTION),
-          where('courseId', '==', courseId)
-        );
-        const watchTimeSnapshot = await getDocs(watchTimeQuery);
-        
-        let studentCount = 0;
-        let completionRate = 0;
-        
-        if (watchTimeSnapshot.docs.length > 0) {
-          studentCount = watchTimeSnapshot.docs.length;
-          const completedStudents = watchTimeSnapshot.docs.filter(doc => {
-            const data = doc.data() as any;
-            return data.completionRate && data.completionRate >= 100;
-          }).length;
-          completionRate = studentCount > 0 ? (completedStudents / studentCount) * 100 : 0;
-        }
-        
-        courseAnalytics.push({
-          courseId,
-          courseTitle: courseData.title || 'Unknown Course',
-          totalRevenue,
-          platformFee,
-          taxAmount,
-          netEarning,
-          totalWatchTime,
-          studentCount,
-          enrollmentCount,
-          completionRate,
-          averageRating: courseData.averageRating || 0,
-          lastUpdated: new Date()
-        });
-      }
-      
-      console.log(`Processed ${courseAnalytics.length} course analytics`);
-      return courseAnalytics;
-      
+        const cNet = ratio * totalNetEarnings;
+        const cFee = ratio * totalPlatformFee;
+        const cTax = ratio * totalTaxAmount;
+        const cGross = ratio * totalGrossRevenue;
+
+        const students = course.totalStudents || 0;
+
+        return {
+          courseId: course.courseId?.toString() || '',
+          courseTitle: course.courseTitle || 'Untitled Course',
+          totalRevenue: Math.round(cGross * 100) / 100,
+          platformFee: Math.round(cFee * 100) / 100,
+          taxAmount: Math.round(cTax * 100) / 100,
+          netEarning: Math.round(cNet * 100) / 100,
+          totalWatchTime: cWatch,
+          studentCount: students,
+          enrollmentCount: students,
+          completionRate: course.completionRate || 0,
+          averageRating: 5,
+          lastUpdated: course.lastAccessed ? new Date(course.lastAccessed) : new Date()
+        };
+      });
+
+      return courseAnalytics.sort((a, b) => b.totalWatchTime - a.totalWatchTime);
     } catch (error) {
-      console.error('Error fetching course analytics:', error);
+      console.error('Error in getCourseAnalytics:', error);
       return [];
     }
   }
 
   async getCourseRevenueBreakdown(instructorId: string, courseId?: string): Promise<CourseRevenueBreakdown[]> {
     try {
-      console.log('Fetching course revenue breakdown for instructor:', instructorId, 'course:', courseId);
-      
-      let q = query(
-        collection(db, this.PAYOUT_REQUESTS_COLLECTION),
-        where('instructorId', '==', instructorId)
-      );
-      
+      const courseAnalytics = await this.getCourseAnalytics(instructorId);
+
       if (courseId && courseId !== 'all') {
-        q = query(q, where('courseId', '==', courseId));
-      }
-      
-      const snapshot = await getDocs(q);
-      
-      let totalPlatformFee = 0;
-      let totalTaxAmount = 0;
-      let totalNetEarning = 0;
-      
-      for (const doc of snapshot.docs) {
-        const data = doc.data() as any;
-        totalPlatformFee += data.platformFee || 0;
-        totalTaxAmount += data.taxAmount || 0;
-        totalNetEarning += data.instructorShare || 0;
-      }
-      
-      const totalAmount = totalPlatformFee + totalTaxAmount + totalNetEarning;
-      
-      const breakdown: CourseRevenueBreakdown[] = [
-        // {
-        //   name: 'Platform Charges',
-        //   value: totalAmount > 0 ? (totalPlatformFee / totalAmount) * 100 : 0,
-        //   color: '#FFD700',
-        //   amount: totalPlatformFee
-        // },
-        // {
-        //   name: 'Tax',
-        //   value: totalAmount > 0 ? (totalTaxAmount / totalAmount) * 100 : 0,
-        //   color: '#DC2626',
-        //   amount: totalTaxAmount
-        // },
-        {
-          name: 'Net Earning',
-          value: totalAmount > 0 ? (totalNetEarning / totalAmount) * 100 : 0,
-          color: '#3B82F6',
-          amount: totalNetEarning
+        const course = courseAnalytics.find(c => c.courseId === courseId);
+        if (!course) return [];
+
+        const net = course.netEarning || 0;
+        const fee = course.platformFee || 0;
+        const tax = course.taxAmount || 0;
+        const total = net + fee + tax;
+
+        if (total === 0) {
+          return [{ name: 'No Earnings Yet', value: 100, color: '#94A3B8', amount: 0 }];
         }
-      ];
-      
-      console.log('Revenue breakdown:', breakdown);
+
+        const breakdown: CourseRevenueBreakdown[] = [
+          {
+            name: 'Net Earning',
+            value: total > 0 ? Math.round((net / total) * 100) : 100,
+            color: '#10B981',
+            amount: net
+          }
+        ];
+
+        if (fee > 0) {
+          breakdown.push({
+            name: 'Platform Charges',
+            value: Math.round((fee / total) * 100),
+            color: '#F59E0B',
+            amount: fee
+          });
+        }
+
+        if (tax > 0) {
+          breakdown.push({
+            name: 'Tax',
+            value: Math.round((tax / total) * 100),
+            color: '#EF4444',
+            amount: tax
+          });
+        }
+
+        return breakdown;
+      }
+
+      // All Courses View: Top courses breakdown
+      const activeCourses = courseAnalytics.filter(c => c.totalWatchTime > 0 || c.netEarning > 0);
+      const totalNet = courseAnalytics.reduce((sum, c) => sum + c.netEarning, 0);
+
+      if (activeCourses.length === 0 || totalNet === 0) {
+        if (totalNet > 0) {
+          return [{ name: 'Net Earning', value: 100, color: '#10B981', amount: totalNet }];
+        }
+        return [{ name: 'No Revenue Yet', value: 100, color: '#94A3B8', amount: 0 }];
+      }
+
+      // Show top active courses by net revenue share
+      const topCourses = activeCourses.slice(0, 6);
+      const otherCourses = activeCourses.slice(6);
+
+      const breakdown: CourseRevenueBreakdown[] = topCourses.map((c, i) => ({
+        name: c.courseTitle.length > 25 ? `${c.courseTitle.substring(0, 23)}...` : c.courseTitle,
+        value: totalNet > 0 ? (c.netEarning / totalNet) * 100 : 0,
+        color: PALETTE[i % PALETTE.length],
+        amount: c.netEarning
+      }));
+
+      if (otherCourses.length > 0) {
+        const otherSum = otherCourses.reduce((sum, c) => sum + c.netEarning, 0);
+        breakdown.push({
+          name: `Other (${otherCourses.length} courses)`,
+          value: totalNet > 0 ? (otherSum / totalNet) * 100 : 0,
+          color: '#94A3B8',
+          amount: otherSum
+        });
+      }
+
       return breakdown;
-      
     } catch (error) {
-      console.error('Error fetching course revenue breakdown:', error);
+      console.error('Error in getCourseRevenueBreakdown:', error);
       return [];
     }
   }
 
   async getCourseRevenueList(instructorId: string, courseId?: string): Promise<CourseRevenueItem[]> {
     try {
-      console.log('Fetching course revenue list for instructor:', instructorId, 'course:', courseId);
-      
       const courseAnalytics = await this.getCourseAnalytics(instructorId);
-      
+
       let filteredCourses = courseAnalytics;
       if (courseId && courseId !== 'all') {
-        filteredCourses = courseAnalytics.filter(course => course.courseId === courseId);
+        filteredCourses = courseAnalytics.filter(c => c.courseId === courseId);
       }
-      
-      const revenueList: CourseRevenueItem[] = filteredCourses.map((course, index) => ({
+
+      return filteredCourses.map((course, index) => ({
         srNo: index + 1,
         courseName: course.courseTitle,
         taxAmount: course.taxAmount,
         platformCharges: course.platformFee,
         netEarning: course.netEarning,
-        totalWatchTime: course.totalWatchTime,
+        totalWatchTime: Math.round(course.totalWatchTime),
         studentCount: course.studentCount
       }));
-      
-      console.log(`Generated ${revenueList.length} revenue list items`);
-      return revenueList;
-      
     } catch (error) {
-      console.error('Error fetching course revenue list:', error);
+      console.error('Error in getCourseRevenueList:', error);
       return [];
     }
-  }
-
-  // Mock data for fallback
-  getMockCourseAnalytics(): CourseAnalyticsData[] {
-    return [
-      {
-        courseId: 'course-1',
-        courseTitle: 'Introduction To Digital Design Part 1',
-        totalRevenue: 99999,
-        platformFee: 60000,
-        taxAmount: 10000,
-        netEarning: 29999,
-        totalWatchTime: 470,
-        studentCount: 15,
-        enrollmentCount: 20,
-        completionRate: 75,
-        averageRating: 4.5,
-        lastUpdated: new Date()
-      }
-    ];
-  }
-
-  getMockRevenueBreakdown(): CourseRevenueBreakdown[] {
-    return [
-      { name: 'Platform Charges', value: 60, color: '#FFD700', amount: 60000 },
-      { name: 'Tax', value: 10, color: '#DC2626', amount: 10000 },
-      { name: 'Net Earning', value: 30, color: '#3B82F6', amount: 29999 }
-    ];
-  }
-
-  getMockRevenueList(): CourseRevenueItem[] {
-    return [
-      {
-        srNo: 1,
-        courseName: 'Introduction To Digital Design Part 1',
-        taxAmount: 10000,
-        platformCharges: 60000,
-        netEarning: 29999,
-        totalWatchTime: 150,
-        studentCount: 5
-      },
-      {
-        srNo: 2,
-        courseName: 'Introduction To Digital Design Part 1',
-        taxAmount: 10000,
-        platformCharges: 60000,
-        netEarning: 29999,
-        totalWatchTime: 60,
-        studentCount: 3
-      },
-      {
-        srNo: 3,
-        courseName: 'Introduction To Digital Design Part 1',
-        taxAmount: 10000,
-        platformCharges: 60000,
-        netEarning: 29999,
-        totalWatchTime: 200,
-        studentCount: 4
-      },
-      {
-        srNo: 4,
-        courseName: 'Introduction To Digital Design Part 1',
-        taxAmount: 10000,
-        platformCharges: 60000,
-        netEarning: 29999,
-        totalWatchTime: 60,
-        studentCount: 3
-      }
-    ];
   }
 }
 

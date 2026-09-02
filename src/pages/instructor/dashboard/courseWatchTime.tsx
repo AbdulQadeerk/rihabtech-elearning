@@ -10,6 +10,7 @@ import { useAuth } from '../../../context/AuthContext';
 
 export const CourseWatchTime = () => {
   const [courseWatchTimeData, setCourseWatchTimeData] = useState<CourseWatchTimeData[]>([]);
+  const [pricingFilter, setPricingFilter] = useState<'all' | 'paid' | 'free'>('all');
   const [selectedCourse, setSelectedCourse] = useState<string>('all');
   const [studentProgress, setStudentProgress] = useState<StudentCourseProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,8 +85,22 @@ export const CourseWatchTime = () => {
     }
   };
 
-  const totalWatchTime = courseWatchTimeData.reduce((sum, course) => sum + course.totalWatchTime, 0);
-  const totalStudents = courseWatchTimeData.reduce((sum, course) => sum + course.totalStudents, 0);
+  const paidCount = courseWatchTimeData.filter(c => c.isPaid !== false && c.pricingType !== 'free').length;
+  const freeCount = courseWatchTimeData.filter(c => c.isPaid === false || c.pricingType === 'free').length;
+
+  const filteredCourses = courseWatchTimeData.filter(course => {
+    if (pricingFilter === 'all') return true;
+    if (pricingFilter === 'paid') return course.isPaid !== false && course.pricingType !== 'free';
+    if (pricingFilter === 'free') return course.isPaid === false || course.pricingType === 'free';
+    return true;
+  });
+
+  const totalWatchTime = filteredCourses.reduce((sum, course) => {
+    if (pricingFilter === 'paid') return sum + (course.paidWatchTime ?? course.totalWatchTime);
+    if (pricingFilter === 'free') return sum + (course.freeWatchTime ?? course.totalWatchTime);
+    return sum + course.totalWatchTime;
+  }, 0);
+  const totalStudents = filteredCourses.reduce((sum, course) => sum + course.totalStudents, 0);
   const averageWatchTime = totalStudents > 0 ? totalWatchTime / totalStudents : 0;
 
   if (loading) {
@@ -99,6 +114,59 @@ export const CourseWatchTime = () => {
 
   return (
     <div className="space-y-6">
+      {/* Filter Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Watch Time Analytics</h2>
+          <p className="text-xs text-gray-500">Filter courses by Paid and Free content models</p>
+        </div>
+        <div className="flex items-center p-1 bg-gray-100 rounded-xl border border-gray-200 self-start sm:self-auto">
+          <button
+            onClick={() => setPricingFilter('all')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              pricingFilter === 'all'
+                ? 'bg-white text-gray-900 shadow-xs'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <span>All Courses</span>
+            <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-gray-200/80 text-gray-700">
+              {courseWatchTimeData.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setPricingFilter('paid')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              pricingFilter === 'paid'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-gray-600 hover:text-emerald-700'
+            }`}
+          >
+            <span>Paid</span>
+            <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+              pricingFilter === 'paid' ? 'bg-emerald-700/80 text-white' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {paidCount}
+            </span>
+          </button>
+          <button
+            onClick={() => setPricingFilter('free')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              pricingFilter === 'free'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-gray-600 hover:text-blue-700'
+            }`}
+          >
+            <span>Free</span>
+            <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+              pricingFilter === 'free' ? 'bg-blue-700/80 text-white' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {freeCount}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -108,7 +176,7 @@ export const CourseWatchTime = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatWatchTime(totalWatchTime)}</div>
-            <p className="text-xs text-muted-foreground">Across all courses</p>
+            <p className="text-xs text-muted-foreground">Across {pricingFilter} courses</p>
           </CardContent>
         </Card>
 
@@ -140,7 +208,7 @@ export const CourseWatchTime = () => {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{courseWatchTimeData.length}</div>
+            <div className="text-2xl font-bold">{filteredCourses.length}</div>
             <p className="text-xs text-muted-foreground">Active courses</p>
           </CardContent>
         </Card>
@@ -156,6 +224,7 @@ export const CourseWatchTime = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Course Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Total Watch Time</TableHead>
                 <TableHead>Students</TableHead>
                 <TableHead>Avg. Watch Time</TableHead>
@@ -165,12 +234,32 @@ export const CourseWatchTime = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {courseWatchTimeData.map((course) => (
-                <TableRow key={course.courseId}>
-                  <TableCell className="font-medium">{course.courseTitle}</TableCell>
-                  <TableCell>{formatWatchTime(course.totalWatchTime)}</TableCell>
-                  <TableCell>{course.totalStudents}</TableCell>
-                  <TableCell>{formatWatchTime(course.averageWatchTime)}</TableCell>
+              {filteredCourses.length > 0 ? (
+                filteredCourses.map((course) => {
+                  const isPaid = course.isPaid !== false && course.pricingType !== 'free';
+                  const displayMinutes = pricingFilter === 'paid'
+                    ? (course.paidWatchTime ?? course.totalWatchTime)
+                    : pricingFilter === 'free'
+                    ? (course.freeWatchTime ?? course.totalWatchTime)
+                    : course.totalWatchTime;
+
+                  return (
+                    <TableRow key={course.courseId}>
+                      <TableCell className="font-medium">{course.courseTitle}</TableCell>
+                      <TableCell>
+                        {isPaid ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Paid
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                            Free
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatWatchTime(displayMinutes)}</TableCell>
+                      <TableCell>{course.totalStudents}</TableCell>
+                      <TableCell>{formatWatchTime(course.averageWatchTime)}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
@@ -184,23 +273,31 @@ export const CourseWatchTime = () => {
                           </span>
                         </div>
                       </TableCell>
-                  <TableCell>
-                    {course.lastAccessed.toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      onClick={() => setSelectedCourse(course.courseId)}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      View Details
-                    </button>
+                      <TableCell>
+                        {course.lastAccessed.toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => setSelectedCourse(course.courseId)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          View Details
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-6 text-gray-500">
+                    No courses found for this filter.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>

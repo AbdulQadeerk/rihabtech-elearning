@@ -1,11 +1,5 @@
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import apiService from './apiService';
+import { API_BASE_URL } from '../lib/api';
 
 export interface RevenueTransaction {
   id: string;
@@ -19,8 +13,8 @@ export interface RevenueTransaction {
   instructorShare: number;
   taxAmount: number;
   totalEarnings: number;
-  processedDate?: Timestamp | Date;
-  requestDate: Timestamp | Date;
+  processedDate?: Date;
+  requestDate?: Date;
   instructorId: string;
   notes?: string;
   courseId?: string;
@@ -65,339 +59,267 @@ export interface RevenueAnalytics {
 }
 
 class RevenueReportService {
-  private PAYOUT_REQUESTS_COLLECTION = 'payoutRequests';
-  private STUDENT_ENROLLMENTS_COLLECTION = 'studentEnrollments';
-  private WATCH_TIME_DATA_COLLECTION = 'watchTimeData';
-  private COURSES_COLLECTION = 'courseDrafts';
-  private USERS_COLLECTION = 'users';
-
   async getRevenueTransactions(
     instructorId: string, 
-    period: number = 1, 
+    period: number = 12, 
     status?: string,
     courseId?: string
   ): Promise<RevenueTransaction[]> {
     try {
-      console.log('Fetching revenue transactions for instructor:', instructorId);
-      
-      // Start with a simple query without date filtering to get all data
-      let q = query(
-        collection(db, this.PAYOUT_REQUESTS_COLLECTION),
-        where('instructorId', '==', instructorId)
-      );
+      console.log('Fetching dynamic revenue transactions for instructor:', instructorId);
 
-      if (status && status !== 'all') {
-        q = query(q, where('status', '==', status));
-      }
+      const [payoutsRes, sharesRes, monthlyRes] = await Promise.allSettled([
+        apiService.get<any[]>(`${API_BASE_URL}instructor-payout/payouts`),
+        apiService.get<any[]>(`${API_BASE_URL}instructor-payout/revenue-shares`),
+        apiService.get<any[]>(`${API_BASE_URL}instructor/dashboard/monthly-revenue?year=${new Date().getFullYear()}`)
+      ]);
 
-      if (courseId && courseId !== 'all') {
-        q = query(q, where('courseId', '==', courseId));
-      }
+      const payouts = payoutsRes.status === 'fulfilled' && Array.isArray(payoutsRes.value) ? payoutsRes.value : [];
+      const shares = sharesRes.status === 'fulfilled' && Array.isArray(sharesRes.value) ? sharesRes.value : [];
+      const monthly = monthlyRes.status === 'fulfilled' && Array.isArray(monthlyRes.value) ? monthlyRes.value : [];
 
-      const snapshot = await getDocs(q);
       const transactions: RevenueTransaction[] = [];
+      const seenKeys = new Set<string>();
 
-      for (const doc of snapshot.docs) {
-        const data = doc.data() as any;
-        
-        // Handle Firebase Timestamps properly
-        let processedDate = data.processedDate;
-        let requestDate = data.requestDate;
-        
-        if (processedDate && processedDate.toDate) {
-          processedDate = processedDate.toDate();
-        } else if (processedDate && processedDate._seconds) {
-          processedDate = new Date(processedDate._seconds * 1000);
-        }
-        
-        if (requestDate && requestDate.toDate) {
-          requestDate = requestDate.toDate();
-        } else if (requestDate && requestDate._seconds) {
-          requestDate = new Date(requestDate._seconds * 1000);
-        }
+      // 1. Process actual payout requests
+      for (const p of payouts) {
+        const monthStr = p.month?.toString() || '';
+        const yearNum = p.year || new Date().getFullYear();
+        const key = `payout-${p.id}`;
+        seenKeys.add(`${monthStr}-${yearNum}`);
 
-        const txnDate = new Date(data.date); 
-const now = new Date();
+        const pStatus = (p.status?.toLowerCase() || 'pending') as any;
+        const reqDate = p.requestedDate ? new Date(p.requestedDate) : new Date(yearNum, 0, 1);
+        const procDate = (pStatus === 'processed' && p.processedDate) ? new Date(p.processedDate) : undefined;
 
-// Clone current date and subtract `period` months
-const pastDate = new Date();
-pastDate.setMonth(now.getMonth() - period);
-
-// Check if txnDate falls in last 1 month
-if (txnDate >= pastDate && txnDate <= now) {
-  // Include this transaction
-} else {
-  continue; // Skip
-}
-        
         transactions.push({
-          id: doc.id,
-          amount: data.amount || 0,
-          status: data.status || 'pending',
-          watchTimeMinutes: data.watchTimeMinutes || 0,
-          courseCount: data.courseCount || 0,
-          month: data.month || '',
-          year: data.year || new Date().getFullYear(),
-          platformFee: data.platformFee || 0,
-          instructorShare: data.instructorShare || 0,
-          taxAmount: data.taxAmount || 0,
-          totalEarnings: data.totalEarnings || 0,
-          processedDate: processedDate,
-          requestDate: requestDate,
-          instructorId: data.instructorId || instructorId,
-          notes: data.notes || '',
-          courseId: data.courseId,
-          courseTitle: data.courseTitle
+          id: key,
+          amount: p.amount || p.netAmount || 0,
+          status: pStatus,
+          watchTimeMinutes: p.totalWatchMinutes || 0,
+          courseCount: p.totalCourses || 1,
+          month: monthStr,
+          year: yearNum,
+          platformFee: p.platformFee || 0,
+          instructorShare: p.netAmount || p.amount || 0,
+          taxAmount: p.taxAmount || 0,
+          totalEarnings: p.amount || p.netAmount || 0,
+          processedDate: procDate,
+          requestDate: reqDate,
+          instructorId: instructorId,
+          notes: p.notes || ''
         });
       }
 
-      console.log(`Found ${transactions.length} revenue transactions for instructor ${instructorId}`);
-      console.log('Sample transaction:', transactions[0]);
-      return transactions;
+      // 2. Process admin calculated revenue shares
+      for (const s of shares) {
+        const monthStr = s.month?.toString() || '';
+        const yearNum = s.year || new Date().getFullYear();
+        const dedupeKey = `${monthStr}-${yearNum}`;
+        if (seenKeys.has(dedupeKey)) continue; // avoid double counting if a payout already exists for this month
+
+        const date = s.calculatedAt ? new Date(s.calculatedAt) : new Date(yearNum, 0, 1);
+        const sStatus = s.status?.toLowerCase();
+        const finalStatus = (sStatus === 'processed' || sStatus === 'approved') ? sStatus : 'pending';
+
+        transactions.push({
+          id: `share-${s.id || dedupeKey}`,
+          amount: s.baseAmount || s.instructorShare || 0,
+          status: finalStatus as any,
+          watchTimeMinutes: s.totalWatchMinutes || s.instructorWatchMinutes || s.watchMinutes || 0,
+          courseCount: 1,
+          month: monthStr,
+          year: yearNum,
+          platformFee: s.platformFee || 0,
+          instructorShare: s.instructorShare || 0,
+          taxAmount: s.taxAmount || 0,
+          totalEarnings: s.instructorShare || 0,
+          processedDate: finalStatus === 'processed' && s.calculatedAt ? new Date(s.calculatedAt) : undefined,
+          requestDate: undefined,
+          instructorId: instructorId,
+          notes: `Revenue Share Calculation (${monthStr}/${yearNum})`
+        });
+        seenKeys.add(dedupeKey);
+      }
+
+      // 3. If no payouts or shares but monthly revenue exists
+      if (transactions.length === 0) {
+        for (const m of monthly) {
+          if ((m.totalInstructorShare || 0) > 0 || (m.totalWatchTime || 0) > 0) {
+            const mParts = (m.month || '').split('-');
+            const mMonth = mParts.length > 1 ? mParts[1] : m.month || '01';
+            const mYear = m.year || new Date().getFullYear();
+
+            transactions.push({
+              id: `monthly-${m.month}`,
+              amount: m.totalRevenue || m.totalInstructorShare || 0,
+              status: 'pending',
+              watchTimeMinutes: m.totalWatchTime || 0,
+              courseCount: 1,
+              month: mMonth,
+              year: mYear,
+              platformFee: m.totalPlatformFee || 0,
+              instructorShare: m.totalInstructorShare || 0,
+              taxAmount: m.totalTax || 0,
+              totalEarnings: m.totalInstructorShare || 0,
+              processedDate: undefined,
+              requestDate: new Date(mYear, parseInt(mMonth, 10) - 1, 1),
+              instructorId: instructorId,
+              notes: `Monthly Earnings for ${m.month}`
+            });
+          }
+        }
+      }
+
+      // Apply status and course filters if passed
+      let filtered = transactions;
+      if (status && status !== 'all') {
+        filtered = filtered.filter(t => t.status === status);
+      }
+      if (courseId && courseId !== 'all') {
+        filtered = filtered.filter(t => t.courseId === courseId);
+      }
+
+      return filtered.sort((a, b) => {
+        const mNumA = a.month.includes('-') ? parseInt(a.month.split('-')[1], 10) : parseInt(a.month, 10);
+        const mNumB = b.month.includes('-') ? parseInt(b.month.split('-')[1], 10) : parseInt(b.month, 10);
+        const valA = (a.year || 0) * 100 + (!isNaN(mNumA) ? mNumA : 0);
+        const valB = (b.year || 0) * 100 + (!isNaN(mNumB) ? mNumB : 0);
+        return valB - valA;
+      });
     } catch (error) {
-      console.error('Error fetching revenue transactions:', error);
-      console.error('Error details:', error);
+      console.error('Error fetching dynamic revenue transactions:', error);
       return [];
     }
   }
 
   async getCourseRevenueData(instructorId: string): Promise<CourseRevenueData[]> {
     try {
-      console.log('Fetching course revenue data for instructor:', instructorId);
-      
-      // Get all courses since courseDrafts don't have instructorId field
-      // In production, you should add instructorId when creating courses
-      const coursesQuery = query(collection(db, this.COURSES_COLLECTION));
-      const coursesSnapshot = await getDocs(coursesQuery);
-      
-      console.log(`Found ${coursesSnapshot.docs.length} total courses, filtering for instructor ${instructorId}`);
-      
-      const courseRevenueData: CourseRevenueData[] = [];
+      console.log('Fetching dynamic course revenue data for instructor:', instructorId);
 
-      for (const courseDoc of coursesSnapshot.docs) {
-        const courseData = courseDoc.data() as any;
-        const courseId = courseDoc.id;
-        
-        // For now, process all courses since we don't have instructorId in courseDrafts
-        // In production, you should add instructorId when creating courses
+      const [coursesRes, earningsRes, statsRes] = await Promise.allSettled([
+        apiService.get<any[]>(`${API_BASE_URL}instructor/dashboard/course-watch-time`),
+        apiService.get<any[]>(`${API_BASE_URL}instructor-payout/earnings`),
+        apiService.get<any>(`${API_BASE_URL}instructor/dashboard/stats`)
+      ]);
 
-        // Get enrollments for this course
-        const enrollmentsQuery = query(
-          collection(db, this.STUDENT_ENROLLMENTS_COLLECTION),
-          where('courseId', '==', courseId)
-        );
-        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+      const courses = coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : [];
+      const earnings = earningsRes.status === 'fulfilled' && Array.isArray(earningsRes.value) ? earningsRes.value : [];
+      const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
 
-        // Get watch time data for this course
-        const watchTimeQuery = query(
-          collection(db, this.WATCH_TIME_DATA_COLLECTION),
-          where('courseId', '==', courseId),
-          where('instructorId', '==', instructorId)
-        );
-        const watchTimeSnapshot = await getDocs(watchTimeQuery);
+      // Calculate total revenue pool for this instructor
+      const totalEarningsFromList = earnings.reduce((sum, e) => sum + (e.earnings || e.instructorShare || 0), 0);
+      const totalInstructorRevenue = totalEarningsFromList > 0 
+        ? totalEarningsFromList 
+        : (stats?.totalRevenue || 0);
 
-        // Get revenue data for this course
-        const revenueQuery = query(
-          collection(db, this.PAYOUT_REQUESTS_COLLECTION),
-          where('instructorId', '==', instructorId),
-          where('courseId', '==', courseId)
-        );
-        const revenueSnapshot = await getDocs(revenueQuery);
+      const totalWatchMinutesAll = courses.reduce((sum, c) => sum + (c.totalWatchTime || 0), 0);
 
-        let totalRevenue = 0;
-        let totalWatchTime = 0;
-        let totalStudents = enrollmentsSnapshot.docs.length;
-        let lastActivity = new Date(0);
-        const monthlyRevenue: { month: string; revenue: number }[] = [];
+      return courses.map(course => {
+        const cWatch = course.totalWatchTime || 0;
+        const cShare = totalWatchMinutesAll > 0 
+          ? (cWatch / totalWatchMinutesAll) * totalInstructorRevenue 
+          : 0;
 
-        // Process revenue data
-        for (const revenueDoc of revenueSnapshot.docs) {
-          const revenueData = revenueDoc.data() as any;
-          totalRevenue += revenueData.instructorShare || 0;
-          
-          const month = revenueData.month || '';
-          if (month) {
-            const existingMonth = monthlyRevenue.find(m => m.month === month);
-            if (existingMonth) {
-              existingMonth.revenue += revenueData.instructorShare || 0;
-            } else {
-              monthlyRevenue.push({
-                month,
-                revenue: revenueData.instructorShare || 0
-              });
-            }
-          }
-        }
+        const students = course.totalStudents || 0;
 
-        // Process watch time data
-        for (const watchDoc of watchTimeSnapshot.docs) {
-          const watchData = watchDoc.data() as any;
-          totalWatchTime += watchData.watchMinutes || 0;
-          
-          const timestamp = watchData.timestamp?.toDate() || new Date(0);
-          if (timestamp > lastActivity) {
-            lastActivity = timestamp;
-          }
-        }
-
-        // Process enrollments for completion rate
-        let completedStudents = 0;
-        for (const enrollmentDoc of enrollmentsSnapshot.docs) {
-          const enrollmentData = enrollmentDoc.data() as any;
-          if (enrollmentData.progress >= 100) {
-            completedStudents++;
-          }
-          
-          const lastAccessed = enrollmentData.lastAccessedAt?.toDate() || new Date(0);
-          if (lastAccessed > lastActivity) {
-            lastActivity = lastAccessed;
-          }
-        }
-
-        const completionRate = totalStudents > 0 ? (completedStudents / totalStudents) * 100 : 0;
-        const averageRevenue = totalStudents > 0 ? totalRevenue / totalStudents : 0;
-
-        courseRevenueData.push({
-          courseId,
-          courseTitle: courseData.title || courseData.courseTitle || 'Unknown Course',
-          totalRevenue,
-          totalStudents,
-          totalWatchTime,
-          averageRevenue,
-          completionRate,
-          lastActivity,
-          monthlyRevenue: monthlyRevenue.sort((a, b) => a.month.localeCompare(b.month)),
-          enrollments: totalStudents,
-          price: courseData.price || 0
-        });
-      }
-
-      console.log(`Found ${courseRevenueData.length} courses with revenue data`);
-      return courseRevenueData;
+        return {
+          courseId: course.courseId?.toString() || '',
+          courseTitle: course.courseTitle || 'Untitled Course',
+          totalRevenue: cShare,
+          totalStudents: students,
+          totalWatchTime: cWatch,
+          averageRevenue: students > 0 ? cShare / students : 0,
+          completionRate: course.completionRate || 0,
+          lastActivity: course.lastAccessed ? new Date(course.lastAccessed) : new Date(),
+          monthlyRevenue: [],
+          enrollments: students,
+          price: 0
+        };
+      });
     } catch (error) {
-      console.error('Error fetching course revenue data:', error);
+      console.error('Error fetching dynamic course revenue data:', error);
       return [];
     }
   }
 
   async getMonthlyTrends(instructorId: string, period: number = 12): Promise<MonthlyTrend[]> {
     try {
-      console.log('Fetching monthly trends for instructor:', instructorId);
-      
+      console.log('Fetching dynamic monthly trends for instructor:', instructorId);
+      const currentYear = new Date().getFullYear();
+
+      const [monthlyCurRes, monthlyPrevRes] = await Promise.allSettled([
+        apiService.get<any[]>(`${API_BASE_URL}instructor/dashboard/monthly-revenue?year=${currentYear}`),
+        apiService.get<any[]>(`${API_BASE_URL}instructor/dashboard/monthly-revenue?year=${currentYear - 1}`)
+      ]);
+
+      const curList = monthlyCurRes.status === 'fulfilled' && Array.isArray(monthlyCurRes.value) ? monthlyCurRes.value : [];
+      const prevList = monthlyPrevRes.status === 'fulfilled' && Array.isArray(monthlyPrevRes.value) ? monthlyPrevRes.value : [];
+      const allMonthly = [...prevList, ...curList];
+
       const trends: MonthlyTrend[] = [];
-      const currentDate = new Date();
-      
-      for (let i = period - 1; i >= 0; i--) {
-        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-        const month = date.toISOString().slice(0, 7); // YYYY-MM format
-        const year = date.getFullYear();
-        
-        // Get revenue data for this month
-        const revenueQuery = query(
-          collection(db, this.PAYOUT_REQUESTS_COLLECTION),
-          where('instructorId', '==', instructorId),
-          where('month', '==', month)
-        );
-        const revenueSnapshot = await getDocs(revenueQuery);
-        
-        let revenue = 0;
-        let watchTime = 0;
-        let courses = 0;
-        const courseIds = new Set<string>();
-        
-      for (const doc of revenueSnapshot.docs) {
-        const data = doc.data() as any;
-        revenue += data.instructorShare || 0;
-        watchTime += data.watchTimeMinutes || 0;
-        if (data.courseId) {
-          courseIds.add(data.courseId);
-        }
-      }
-        
-        courses = courseIds.size;
-        
-        // Get student count for this month
-        const startOfMonth = new Date(year, date.getMonth(), 1);
-        const endOfMonth = new Date(year, date.getMonth() + 1, 0);
-        
-        // Get all enrollments for this month since studentEnrollments might not have instructorId
-        const enrollmentsQuery = query(
-          collection(db, this.STUDENT_ENROLLMENTS_COLLECTION)
-        );
-        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-        
-        // Filter enrollments for this month
-        const monthlyEnrollments = enrollmentsSnapshot.docs.filter(doc => {
-          const data = doc.data() as any;
-          const enrolledAt = data.enrolledAt?.toDate ? data.enrolledAt.toDate() : new Date(data.enrolledAt?._seconds * 1000);
-          return enrolledAt >= startOfMonth && enrolledAt <= endOfMonth;
-        });
-        
-        const students = monthlyEnrollments.length;
-        
-        // Calculate growth compared to previous month
+      let prevRevenue = 0;
+
+      for (const m of allMonthly) {
+        const rev = m.totalInstructorShare || m.totalRevenue || 0;
         let growth = 0;
-        if (i < period - 1) {
-          const prevMonth = trends[trends.length - 1];
-          if (prevMonth.revenue > 0) {
-            growth = ((revenue - prevMonth.revenue) / prevMonth.revenue) * 100;
-          }
+        if (prevRevenue > 0) {
+          growth = ((rev - prevRevenue) / prevRevenue) * 100;
         }
-        
+        prevRevenue = rev;
+
         trends.push({
-          month,
-          revenue,
-          students,
-          courses,
-          watchTime,
-          growth,
-          enrollments: students
+          month: m.month,
+          revenue: rev,
+          students: 0,
+          courses: 0,
+          watchTime: m.totalWatchTime || 0,
+          growth: growth,
+          enrollments: 0
         });
       }
-      
-      console.log(`Generated ${trends.length} monthly trends`);
-      return trends;
+
+      return trends.slice(-period);
     } catch (error) {
-      console.error('Error fetching monthly trends:', error);
+      console.error('Error fetching dynamic monthly trends:', error);
       return [];
     }
   }
 
   async getRevenueAnalytics(instructorId: string, period: number = 12): Promise<RevenueAnalytics> {
     try {
-      console.log('Fetching revenue analytics for instructor:', instructorId);
-      
-      const transactions = await this.getRevenueTransactions(instructorId, period);
-      const courseData = await this.getCourseRevenueData(instructorId);
-      const trends = await this.getMonthlyTrends(instructorId, period);
-      
-      const totalRevenue = transactions.reduce((sum, t) => sum + t.totalEarnings, 0);
-      const totalPending = transactions
+      const [txns, courses, trends] = await Promise.all([
+        this.getRevenueTransactions(instructorId, period),
+        this.getCourseRevenueData(instructorId),
+        this.getMonthlyTrends(instructorId, period)
+      ]);
+
+      const totalRevenue = txns.reduce((sum, t) => sum + (t.totalEarnings || t.amount || 0), 0);
+      const totalPending = txns
         .filter(t => t.status === 'pending')
-        .reduce((sum, t) => sum + t.totalEarnings, 0);
-      const totalProcessed = transactions
-        .filter(t => t.status === 'processed')
-        .reduce((sum, t) => sum + t.totalEarnings, 0);
-      const totalWatchTime = transactions.reduce((sum, t) => sum + t.watchTimeMinutes, 0);
-      const totalStudents = courseData.reduce((sum, c) => sum + c.totalStudents, 0);
-      const totalCourses = courseData.length;
-      
+        .reduce((sum, t) => sum + (t.totalEarnings || t.amount || 0), 0);
+      const totalProcessed = txns
+        .filter(t => t.status === 'processed' || t.status === 'approved')
+        .reduce((sum, t) => sum + (t.totalEarnings || t.amount || 0), 0);
+      const totalWatchTime = courses.reduce((sum, c) => sum + c.totalWatchTime, 0);
+      const totalStudents = courses.reduce((sum, c) => sum + c.totalStudents, 0);
+      const totalCourses = courses.length;
+
       const averageRevenuePerStudent = totalStudents > 0 ? totalRevenue / totalStudents : 0;
       const averageWatchTimePerStudent = totalStudents > 0 ? totalWatchTime / totalStudents : 0;
-      const completionRate = courseData.length > 0 
-        ? courseData.reduce((sum, c) => sum + c.completionRate, 0) / courseData.length 
+      const completionRate = totalCourses > 0 
+        ? courses.reduce((sum, c) => sum + c.completionRate, 0) / totalCourses 
         : 0;
-      
-      // Calculate monthly growth
+
       let monthlyGrowth = 0;
       if (trends.length >= 2) {
-        const currentMonth = trends[trends.length - 1];
-        const previousMonth = trends[trends.length - 2];
-        if (previousMonth.revenue > 0) {
-          monthlyGrowth = ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100;
+        const cur = trends[trends.length - 1];
+        const prev = trends[trends.length - 2];
+        if (prev.revenue > 0) {
+          monthlyGrowth = ((cur.revenue - prev.revenue) / prev.revenue) * 100;
         }
       }
-      
+
       return {
         totalRevenue,
         totalPending,
@@ -411,7 +333,7 @@ if (txnDate >= pastDate && txnDate <= now) {
         monthlyGrowth
       };
     } catch (error) {
-      console.error('Error fetching revenue analytics:', error);
+      console.error('Error calculating dynamic revenue analytics:', error);
       return {
         totalRevenue: 0,
         totalPending: 0,

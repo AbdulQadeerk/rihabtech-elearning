@@ -1,19 +1,16 @@
 import {
     Table,
     TableBody,
-    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
   } from "../../../components/ui/table";
-  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { useEffect, useState } from "react";
-import { ChevronDown, BarChart3, TrendingUp, DollarSign, Users, BookOpen, Clock, RefreshCw } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { BarChart3, RefreshCw } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { useAuth } from "../../../context/AuthContext";
-import { getInstructorCourses, InstructorCourse } from "../../../utils/firebaseInstructorCourses";
-import { CourseDisplayData } from "../course/courseList";
 import RevenueReport from "./revenueReport";
 import courseAnalyticsService, { 
   CourseAnalyticsData, 
@@ -129,14 +126,14 @@ export const CourseWiseReports = () =>{
                         <div className="bg-gray-50 p-6 flex flex-col space-y-6 md:flex-row md:space-y-0 md:space-x-6">
                             <div className="flex-1">
                                 <RevenueCard 
-                                    title="All Courses" 
+                                    title={selectedCourseForAnalytics === "all" ? "All Courses" : (courseAnalytics.find(c => c.courseId === selectedCourseForAnalytics)?.courseTitle || "Course")} 
                                     data={revenueBreakdown} 
                                     showDropdown={true}
                                     showLegend={true}
                                     selectedCourse={selectedCourseForAnalytics}
                                     onCourseChange={setSelectedCourseForAnalytics}
                                     courses={courseAnalytics}
-                                    totalRevenue={revenueBreakdown.reduce((sum, item) => sum + item.amount, 0)}
+                                    totalRevenue={selectedCourseForAnalytics === "all" ? revenueBreakdown.reduce((sum, item) => sum + item.amount, 0) : (courseAnalytics.find(c => c.courseId === selectedCourseForAnalytics)?.netEarning || 0)}
                                 />
                             </div>
                         </div>

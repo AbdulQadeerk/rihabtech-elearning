@@ -7,10 +7,14 @@ export interface CourseWatchTimeData {
   courseId: string;
   courseTitle: string;
   totalWatchTime: number; // in minutes
+  paidWatchTime?: number; // in minutes
+  freeWatchTime?: number; // in minutes
   totalStudents: number;
   averageWatchTime: number; // in minutes
   completionRate: number; // percentage
   lastAccessed: Date;
+  isPaid?: boolean;
+  pricingType?: 'paid' | 'free';
   watchTimeByMonth: { [month: string]: number };
 }
 
@@ -31,29 +35,38 @@ class CourseWatchTimeService {
   private USERS_COLLECTION = 'users';
 
   // Get course-wise watch time data for an instructor
-  async getCourseWatchTimeData(instructorId: string): Promise<CourseWatchTimeData[]> {
+  async getCourseWatchTimeData(instructorId: string, pricingType?: string): Promise<CourseWatchTimeData[]> {
     try {
-      console.log(`Fetching course watch time data for instructor: ${instructorId}`);
+      console.log(`Fetching course watch time data for instructor: ${instructorId}, filter: ${pricingType}`);
 
+      const params = pricingType && pricingType !== 'all' ? `?pricingType=${pricingType}` : '';
       // Call the new API endpoint
       const response = await apiService.get<Array<{
         courseId: number;
         courseTitle: string;
         totalWatchTime: number;
+        paidWatchTime?: number;
+        freeWatchTime?: number;
         totalStudents: number;
         averageWatchTime: number;
         completionRate: number;
         lastAccessed: string;
-      }>>(`${API_BASE_URL}instructor/dashboard/course-watch-time`);
+        isPaid?: boolean;
+        pricingType?: 'paid' | 'free';
+      }>>(`${API_BASE_URL}instructor/dashboard/course-watch-time${params}`);
 
       return response.map(item => ({
         courseId: item.courseId.toString(),
         courseTitle: item.courseTitle,
         totalWatchTime: item.totalWatchTime || 0,
+        paidWatchTime: item.paidWatchTime ?? (item.isPaid !== false ? item.totalWatchTime || 0 : 0),
+        freeWatchTime: item.freeWatchTime ?? (item.isPaid === false ? item.totalWatchTime || 0 : 0),
         totalStudents: item.totalStudents || 0,
         averageWatchTime: item.averageWatchTime || 0,
         completionRate: item.completionRate || 0,
         lastAccessed: new Date(item.lastAccessed),
+        isPaid: item.isPaid !== false,
+        pricingType: item.pricingType || (item.isPaid === false ? 'free' : 'paid'),
         watchTimeByMonth: {} // Can be populated if needed
       }));
     } catch (error) {
@@ -135,10 +148,14 @@ class CourseWatchTimeService {
           courseId,
           courseTitle: courseData.title || courseData.courseTitle || 'Unknown Course',
           totalWatchTime,
+          paidWatchTime: totalWatchTime,
+          freeWatchTime: 0,
           totalStudents,
           averageWatchTime,
           completionRate,
           lastAccessed,
+          isPaid: true,
+          pricingType: 'paid',
           watchTimeByMonth
         });
 

@@ -48,12 +48,20 @@ export interface PayoutBreakdown {
   courseBreakdown?: CourseEarnings[];
 }
 
+export interface CourseLearnerDetail {
+  userId: number;
+  learnerName?: string;
+  learnerEmail?: string;
+  watchMinutes: number;
+}
+
 export interface CourseEarnings {
   courseId: number | string;
   courseTitle: string;
   watchMinutes: number;
   earnings: number;
   enrollments: number;
+  learners?: CourseLearnerDetail[];
 }
 
 export interface InstructorEarnings {
@@ -146,11 +154,18 @@ class InstructorPayoutApiService {
   }
 
   // Request a payout
-  async requestPayout(month: string, year: number): Promise<PayoutRequest> {
+  async requestPayout(month: string, year: number, bankDetails?: {
+    bankName?: string;
+    bankAccountNumber?: string;
+    ifscCode?: string;
+    accountHolderName?: string;
+    notes?: string;
+  }): Promise<PayoutRequest> {
     try {
       const response = await apiClient.post<PayoutRequest>(`${this.BASE_URL}/request`, {
         month,
-        year
+        year,
+        ...bankDetails
       });
       return this.mapToPayoutRequest(response.data);
     } catch (error: any) {
@@ -177,13 +192,18 @@ class InstructorPayoutApiService {
       const params = year ? `?year=${year}` : '';
       const earnings = await apiClient.get<InstructorEarnings[]>(`${this.BASE_URL}/earnings${params}`);
       
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const currentMonthData = earnings.data.find(e => e.month === currentMonth);
+      const now = new Date();
+      const currentMonth2 = String(now.getMonth() + 1).padStart(2, '0');
+      const currentMonth1 = String(now.getMonth() + 1);
+      const currentMonthWithYear = `${now.getFullYear()}-${currentMonth2}`;
+      const currentMonthData = earnings.data.find(e => 
+        e.month === currentMonth2 || e.month === currentMonth1 || e.month === currentMonthWithYear
+      );
       
       // Get payout history to calculate pending/processed
       const payouts = await this.getPayoutHistory();
       const pendingPayouts = payouts.filter(p => 
-        p.status.toLowerCase() === 'pending' || p.status.toLowerCase() === 'approved'
+        p.status.toLowerCase() === 'pending' || p.status.toLowerCase() === 'approved' || p.status.toLowerCase() === 'processing'
       );
       const processedPayouts = payouts.filter(p => p.status.toLowerCase() === 'processed');
 
@@ -192,8 +212,12 @@ class InstructorPayoutApiService {
       const currentMonthEarnings = currentMonthData?.totalEarnings || 0;
       const totalWatchTime = earnings.data.reduce((sum, e) => sum + e.totalWatchMinutes, 0);
       const totalCourses = earnings.data.reduce((sum, e) => sum + e.totalCourses, 0);
-      const availableForPayout = pendingPayouts.reduce((sum, p) => sum + p.instructorShare, 0) + 
-                                  (currentMonthData?.totalEarnings || 0);
+
+      const totalProcessedAmount = processedPayouts.reduce((sum, p) => sum + (p.instructorShare || p.amount || 0), 0);
+      const totalPendingAmount = pendingPayouts.reduce((sum, p) => sum + (p.instructorShare || p.amount || 0), 0);
+
+      // Available for payout = Total Earnings - Processed - Pending (min 0)
+      const availableForPayout = Math.max(0, Math.round((totalEarnings - totalProcessedAmount - totalPendingAmount) * 100) / 100);
 
       return {
         totalEarnings,
@@ -232,6 +256,18 @@ class InstructorPayoutApiService {
       return response.data;
     } catch (error: any) {
       console.error('Error getting course earnings:', error);
+      return [];
+    }
+  }
+
+  // Get all earnings
+  async getEarnings(year?: number): Promise<InstructorEarnings[]> {
+    try {
+      const params = year ? `?year=${year}` : '';
+      const response = await apiClient.get<InstructorEarnings[]>(`${this.BASE_URL}/earnings${params}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error getting earnings:', error);
       return [];
     }
   }

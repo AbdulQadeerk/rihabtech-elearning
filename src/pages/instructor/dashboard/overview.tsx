@@ -39,6 +39,11 @@ interface MonthlyRevenueSummary {
   totalWatchTime: number;
 }
 
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
 export const Overview = () =>{
     const navigate = useNavigate();
     const [revenueMonthly, setRevenueMonthly] = useState<MonthlyRevenueSummary[]>([]);
@@ -47,10 +52,7 @@ export const Overview = () =>{
     const [revenueStats, setRevenueStats] = useState<RevenueData[]>([]);
     const [courses, setCourses] = useState<CourseDisplayData[]>([]);
     const [courseWatchTimeData, setCourseWatchTimeData] = useState<CourseWatchTimeData[]>([]);
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+    const [watchTimePricingFilter, setWatchTimePricingFilter] = useState<'all' | 'paid' | 'free'>('all');
 
     const [selectedCourse, setSelectedCourse] = useState<string >('all-courses');
     const [loading, setLoading] = useState(true);
@@ -89,13 +91,19 @@ export const Overview = () =>{
                     courseWatchTimeService.getCourseWatchTimeData(instructorId)
                 ]);
 
-                const revenueWithMonthNames = revenue.map((item) => ({
-                ...item,
-                month: monthNames[parseInt(item.month, 10) - 1],
-                }));
-              setDashboardStats(stats);
-              setRevenueStats(revenueWithMonthNames);
-              setCourseWatchTimeData(watchTimeData);
+                const revenueWithMonthNames = revenue.map((item) => {
+                  let mIndex = parseInt(item.month, 10) - 1;
+                  if (item.month.includes('-')) {
+                    mIndex = parseInt(item.month.split('-')[1], 10) - 1;
+                  }
+                  return {
+                    ...item,
+                    month: monthNames[mIndex] || item.month,
+                  };
+                });
+                setDashboardStats(stats);
+                setRevenueStats(revenueWithMonthNames);
+                setCourseWatchTimeData(watchTimeData);
               console.log("Course watch time data loaded:", watchTimeData);
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
@@ -247,7 +255,7 @@ export const Overview = () =>{
           </div>
         </div>
         
-        <div className="flex flex-col md:flex-row gap-2 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatsCard 
             title="Total Watch Time" 
             value={dashboardStats?.totalWatchtime ? `${dashboardStats.totalWatchtime.toLocaleString()} Min` : '0 Min'}
@@ -279,132 +287,239 @@ export const Overview = () =>{
         }
         
         {/* Course-wise Watch Time Section */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Course-wise Watch Time</h2>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Watch Time</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {formatWatchTime(courseWatchTimeData.reduce((sum, course) => sum + course.totalWatchTime, 0))}
-                    </p>
-                  </div>
+        {(() => {
+          const paidCoursesCount = courseWatchTimeData.filter(c => c.isPaid !== false && c.pricingType !== 'free').length;
+          const freeCoursesCount = courseWatchTimeData.filter(c => c.isPaid === false || c.pricingType === 'free').length;
+
+          const filteredCourses = courseWatchTimeData.filter(course => {
+            if (watchTimePricingFilter === 'all') return true;
+            if (watchTimePricingFilter === 'paid') return course.isPaid !== false && course.pricingType !== 'free';
+            if (watchTimePricingFilter === 'free') return course.isPaid === false || course.pricingType === 'free';
+            return true;
+          });
+
+          const totalFilteredWatchTime = filteredCourses.reduce((sum, course) => {
+            if (watchTimePricingFilter === 'paid') return sum + (course.paidWatchTime ?? course.totalWatchTime);
+            if (watchTimePricingFilter === 'free') return sum + (course.freeWatchTime ?? course.totalWatchTime);
+            return sum + course.totalWatchTime;
+          }, 0);
+
+          const totalFilteredStudents = filteredCourses.reduce((sum, course) => sum + course.totalStudents, 0);
+          const avgFilteredWatchTime = totalFilteredStudents > 0 ? totalFilteredWatchTime / totalFilteredStudents : 0;
+
+          return (
+            <div className="mt-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Course-wise Watch Time</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Track performance, watch minutes, and student engagement across your courses
+                  </p>
+                </div>
+
+                {/* Paid / Free Filter Controls */}
+                <div className="flex items-center p-1 bg-gray-100 rounded-xl border border-gray-200 self-start sm:self-auto">
+                  <button
+                    onClick={() => setWatchTimePricingFilter('all')}
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                      watchTimePricingFilter === 'all'
+                        ? 'bg-white text-gray-900 shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <span>All Courses</span>
+                    <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-gray-200/80 text-gray-700">
+                      {courseWatchTimeData.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setWatchTimePricingFilter('paid')}
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                      watchTimePricingFilter === 'paid'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-gray-600 hover:text-emerald-700'
+                    }`}
+                  >
+                    <span>Paid</span>
+                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+                      watchTimePricingFilter === 'paid' ? 'bg-emerald-700/80 text-white' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {paidCoursesCount}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setWatchTimePricingFilter('free')}
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                      watchTimePricingFilter === 'free'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-gray-600 hover:text-blue-700'
+                    }`}
+                  >
+                    <span>Free</span>
+                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+                      watchTimePricingFilter === 'free' ? 'bg-blue-700/80 text-white' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {freeCoursesCount}
+                    </span>
+                  </button>
                 </div>
               </div>
-              
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
+
+              <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6">
+                {/* Dynamically Filtered Metric Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50/80 border border-blue-100 p-4 rounded-xl">
+                    <div className="flex items-center">
+                      <div className="p-2.5 bg-blue-100 rounded-lg shrink-0">
+                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4 min-w-0">
+                        <p className="text-xs font-medium text-gray-600">Total Watch Time</p>
+                        <p className="text-2xl font-bold text-gray-900 truncate">
+                          {formatWatchTime(totalFilteredWatchTime)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Students</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {courseWatchTimeData.reduce((sum, course) => sum + course.totalStudents, 0)}
-                    </p>
+                  
+                  <div className="bg-green-50/80 border border-green-100 p-4 rounded-xl">
+                    <div className="flex items-center">
+                      <div className="p-2.5 bg-green-100 rounded-lg shrink-0">
+                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4 min-w-0">
+                        <p className="text-xs font-medium text-gray-600">Total Students</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {totalFilteredStudents.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-purple-50/80 border border-purple-100 p-4 rounded-xl">
+                    <div className="flex items-center">
+                      <div className="p-2.5 bg-purple-100 rounded-lg shrink-0">
+                        <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <div className="ml-4 min-w-0">
+                        <p className="text-xs font-medium text-gray-600">Avg. Watch Time</p>
+                        <p className="text-2xl font-bold text-gray-900 truncate">
+                          {formatWatchTime(avgFilteredWatchTime)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-orange-50/80 border border-orange-100 p-4 rounded-xl">
+                    <div className="flex items-center">
+                      <div className="p-2.5 bg-orange-100 rounded-lg shrink-0">
+                        <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      </div>
+                      <div className="ml-4 min-w-0">
+                        <p className="text-xs font-medium text-gray-600">Total Courses</p>
+                        <p className="text-2xl font-bold text-gray-900">{filteredCourses.length}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Avg. Watch Time</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {formatWatchTime(
-                        courseWatchTimeData.reduce((sum, course) => sum + course.totalStudents, 0) > 0
-                          ? courseWatchTimeData.reduce((sum, course) => sum + course.totalWatchTime, 0) / 
-                            courseWatchTimeData.reduce((sum, course) => sum + course.totalStudents, 0)
-                          : 0
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50/80">
+                      <tr>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Course Name</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Watch Time</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Students</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Avg. Watch Time</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Completion Rate</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Accessed</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {filteredCourses.length > 0 ? (
+                        filteredCourses.map((course) => {
+                          const isPaidCourse = course.isPaid !== false && course.pricingType !== 'free';
+                          const displayWatchTime = watchTimePricingFilter === 'paid' 
+                            ? (course.paidWatchTime ?? course.totalWatchTime)
+                            : watchTimePricingFilter === 'free'
+                            ? (course.freeWatchTime ?? course.totalWatchTime)
+                            : course.totalWatchTime;
+
+                          return (
+                            <tr key={course.courseId} className="hover:bg-gray-50/70 transition-colors">
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900 max-w-xs md:max-w-md truncate" title={course.courseTitle}>
+                                  {course.courseTitle}
+                                </div>
+                              </td>
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                {isPaidCourse ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Paid
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                    Free
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 font-semibold">{formatWatchTime(displayWatchTime)}</div>
+                              </td>
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="text-sm text-gray-700">{course.totalStudents}</div>
+                              </td>
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="text-sm text-gray-700">{formatWatchTime(course.averageWatchTime)}</div>
+                              </td>
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-primary h-2 rounded-full transition-all" 
+                                      style={{ width: `${course.completionRate}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-xs text-gray-600 font-medium">{Math.round(course.completionRate)}%</span>
+                                </div>
+                              </td>
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="text-xs text-gray-500">
+                                  {course.lastAccessed.toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-8 text-center text-gray-500 text-sm">
+                            No {watchTimePricingFilter === 'paid' ? 'paid' : watchTimePricingFilter === 'free' ? 'free' : ''} courses found with watch time.
+                          </td>
+                        </tr>
                       )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <div className="flex items-center">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Courses</p>
-                    <p className="text-2xl font-bold text-gray-900">{courseWatchTimeData.length}</p>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
-            
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Watch Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Watch Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Accessed</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {courseWatchTimeData.map((course) => (
-                    <tr key={course.courseId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{course.courseTitle}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 font-semibold">{formatWatchTime(course.totalWatchTime)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{course.totalStudents}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatWatchTime(course.averageWatchTime)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${course.completionRate}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-gray-900">{Math.round(course.completionRate)}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {course.lastAccessed.toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
       </div>
     )
@@ -500,28 +615,34 @@ const StatsCard = ({ title, value, growth, period }: StatsCardProps) => {
     }
 
       const tableData = data.map((row:any) => {
-      console.log("Processing row:", row);
-    const [year, month] = row?.month?.split("-");
-    const monthName = new Date(Number(year), Number(month) - 1).toLocaleString("default", {
-      month: "long",
-    });
+      let monthName = "";
+      let year = row.year || new Date().getFullYear();
+      if (row?.month?.includes("-")) {
+        const parts = row.month.split("-");
+        year = parts[0];
+        const m = parseInt(parts[1], 10);
+        monthName = monthNames[m - 1] || parts[1];
+      } else if (!isNaN(parseInt(row?.month, 10))) {
+        const m = parseInt(row.month, 10);
+        monthName = monthNames[m - 1] || row.month;
+      } else {
+        monthName = row.month;
+      }
 
-      console.log(`Month: ${row?.month}, Year: ${year}, Month: ${month}, MonthName: ${monthName}`);
-
-    return {
-      month: `${monthName} ${year}`,
+      return {
+        month: `${monthName} ${year}`,
         preTax: row.totalRevenue || 0,         // Pre-Tax Amount
         withoutHolding: row.withoutHoldingTax || 0,        // Without Holding Tax
         netEarning: row.totalInstructorShare || 0,   // Net Earning
         watchTime: row.totalWatchTime || 0,    // Total Watch Time
-      payoutDate: row.processedDate
-        ? format(
-            row.processedDate.toDate ? row.processedDate.toDate() : row.processedDate,
-            "dd MMM yyyy"
-          )
-        : "N/A",
-    };
-  });
+        payoutDate: row.processedDate
+          ? format(
+              row.processedDate.toDate ? row.processedDate.toDate() : new Date(row.processedDate),
+              "dd MMM yyyy"
+            )
+          : "N/A",
+      };
+    });
 
     console.log("Table data after processing:", tableData);
     console.log("Months in table data:", tableData.map((t: any) => t.month));

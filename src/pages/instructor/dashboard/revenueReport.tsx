@@ -23,11 +23,7 @@ import revenueReportService, {
   MonthlyTrend, 
   RevenueAnalytics 
 } from '../../../utils/revenueReportService';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../../lib/firebase';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-
-// Interfaces are now imported from the service
 
 const RevenueReport: React.FC = () => {
   const { user } = useAuth();
@@ -36,34 +32,20 @@ const RevenueReport: React.FC = () => {
   const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]);
   const [analytics, setAnalytics] = useState<RevenueAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState('1');
+  const [selectedPeriod, setSelectedPeriod] = useState('12');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState('all');
   const [viewMode, setViewMode] = useState<'table' | 'chart' | 'analytics'>('table');
 
   const instructorId = user?.UserName || user?.email;
-  console.log('Current user:', user);
-  console.log('Using instructorId:', instructorId);
 
   const loadRevenueData = useCallback(async () => {
     if (!instructorId) return;
     try {
       setLoading(true);
-      console.log('Loading revenue data for instructor:', instructorId);
-      
-      const period = parseInt(selectedPeriod);
-      
-      console.log('Fetching real-time data from Firebase...');
-      
-      // Test Firebase connection first
-      console.log('Testing Firebase connection...');
-      const testQuery = query(collection(db, 'payoutRequests'), where('instructorId', '==', instructorId));
-      const testSnapshot = await getDocs(testQuery);
-      console.log('Firebase test query result:', testSnapshot.docs.length, 'documents found');
-      
-      if (testSnapshot.docs.length > 0) {
-        console.log('Sample Firebase document:', testSnapshot.docs[0].data());
-      }
+      const period = selectedPeriod === 'custom' ? 60 : (parseInt(selectedPeriod, 10) || 12);
       
       const [transactions, courses, trends, analyticsData] = await Promise.all([
         revenueReportService.getRevenueTransactions(instructorId, period, selectedStatus, selectedCourse),
@@ -130,11 +112,11 @@ const RevenueReport: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'processed': return 'bg-green-100 text-green-800';
-      case 'approved': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'processed': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'approved': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'pending': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -144,7 +126,17 @@ const RevenueReport: React.FC = () => {
       case 'approved': return '⏳';
       case 'pending': return '⏱️';
       case 'rejected': return '❌';
-      default: return '?';
+      default: return '⏱️';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'processed': return 'Processed';
+      case 'approved': return 'Approved';
+      case 'pending': return 'Pending Payout';
+      case 'rejected': return 'Rejected';
+      default: return 'Pending Payout';
     }
   };
 
@@ -157,25 +149,71 @@ const RevenueReport: React.FC = () => {
     }).format(amount);
   };
 
+  const formatWatchTime = (minutes: number): string => {
+    const totalMins = Math.round(minutes || 0);
+    const hours = Math.floor(totalMins / 60);
+    const remainingMinutes = totalMins % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  };
+
   const formatDate = (date: any) => {
-    if (!date) return 'N/A';
+    if (!date) return '—';
     const dateObj = date.toDate ? date.toDate() : new Date(date);
+    if (isNaN(dateObj.getTime()) || dateObj.getTime() === 0) return '—';
     return format(dateObj, 'dd MMM yyyy');
   };
 
   const filteredRevenueData = revenueData.filter(item => {
     if (selectedStatus !== 'all' && item.status !== selectedStatus) return false;
-    if (selectedCourse !== 'all') {
-      // Filter by course if needed
-      return true; // Simplified for now
+    if (selectedCourse !== 'all' && item.courseId && item.courseId !== selectedCourse) return false;
+
+    const mNum = item.month.includes('-') 
+      ? parseInt(item.month.split('-')[1], 10) 
+      : parseInt(item.month, 10);
+    const itemMonth = !isNaN(mNum) && mNum >= 1 && mNum <= 12 ? mNum - 1 : 0;
+    const itemYear = item.year || new Date().getFullYear();
+    const itemDate = new Date(itemYear, itemMonth, 1);
+
+    if (selectedPeriod === 'custom') {
+      if (customStartDate) {
+        const start = new Date(customStartDate);
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        if (itemDate < start) return false;
+      }
+      if (customEndDate) {
+        const end = new Date(customEndDate);
+        end.setHours(23, 59, 59, 999);
+        if (itemDate > end) return false;
+      }
+      return true;
     }
+
+    const periodMonths = parseInt(selectedPeriod, 10);
+    if (!isNaN(periodMonths) && periodMonths > 0) {
+      const now = new Date();
+      const diffMonths = (now.getFullYear() - itemYear) * 12 + (now.getMonth() - itemMonth);
+      
+      if (periodMonths === 1) {
+        if (diffMonths > 1) return false;
+      } else {
+        if (diffMonths > periodMonths) return false;
+      }
+    }
+
     return true;
   });
 
-  const totalRevenue = analytics?.totalRevenue || filteredRevenueData.reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
-  const totalPending = analytics?.totalPending || filteredRevenueData.filter(item => item.status === 'pending').reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
-  const totalProcessed = analytics?.totalProcessed || filteredRevenueData.filter(item => item.status === 'processed').reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
-  const totalWatchTime = analytics?.totalWatchTime || filteredRevenueData.reduce((sum, item) => sum + item.watchTimeMinutes, 0);
+  const totalRevenue = filteredRevenueData.reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
+  const totalProcessed = filteredRevenueData.filter(item => item.status === 'processed').reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
+  const totalPending = filteredRevenueData.filter(item => item.status === 'pending' || item.status === 'approved').reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
+  
+  const totalFilteredWatchTime = filteredRevenueData.reduce((sum, item) => sum + (item.watchTimeMinutes || 0), 0);
+  const totalAllRevenue = revenueData.reduce((sum, item) => sum + (item.totalEarnings || item.amount || 0), 0);
+  const totalAllWatchTime = courseRevenueData.reduce((sum, c) => sum + (c.totalWatchTime || 0), 0);
+  const totalWatchTime = totalFilteredWatchTime > 0 
+    ? totalFilteredWatchTime 
+    : (totalAllRevenue > 0 ? (totalRevenue / totalAllRevenue) * totalAllWatchTime : 0);
 
   console.log('=== REVENUE CALCULATION DEBUG ===');
   console.log('Analytics object:', analytics);
@@ -276,6 +314,7 @@ const RevenueReport: React.FC = () => {
                   <SelectItem value="6">Last 6 months</SelectItem>
                   <SelectItem value="12">Last 12 months</SelectItem>
                   <SelectItem value="24">Last 2 years</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -324,6 +363,69 @@ const RevenueReport: React.FC = () => {
               </Select>
             </div>
           </div>
+
+          {/* Custom Date Range Picker */}
+          {selectedPeriod === 'custom' && (
+            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/80 p-3.5 rounded-xl border border-gray-200/70 animate-in fade-in duration-200">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-600">Start Date:</span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 shadow-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-600">End Date:</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const ytd = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+                    setCustomStartDate(ytd);
+                    setCustomEndDate(now.toISOString().split('T')[0]);
+                  }}
+                  className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-gray-100 border border-gray-200 rounded-md text-gray-700 shadow-xs transition-colors"
+                >
+                  This Year
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const last90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    setCustomStartDate(last90);
+                    setCustomEndDate(now.toISOString().split('T')[0]);
+                  }}
+                  className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-gray-100 border border-gray-200 rounded-md text-gray-700 shadow-xs transition-colors"
+                >
+                  Last 90 Days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomStartDate('');
+                    setCustomEndDate('');
+                  }}
+                  className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-gray-100 border border-gray-200 rounded-md text-gray-500 shadow-xs transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -332,8 +434,8 @@ const RevenueReport: React.FC = () => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 font-bold text-xl select-none">
+                ₹
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
@@ -379,7 +481,7 @@ const RevenueReport: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Watch Time</p>
-                <p className="text-2xl font-bold text-gray-900">{Math.round(totalWatchTime / 60)}h</p>
+                <p className="text-2xl font-bold text-gray-900">{formatWatchTime(totalWatchTime)}</p>
               </div>
             </div>
           </CardContent>
@@ -417,18 +519,24 @@ const RevenueReport: React.FC = () => {
                   {filteredRevenueData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
-                        {format(new Date(item.year, parseInt(item.month.split('-')[1]) - 1), 'MMM yyyy')}
+                        {(() => {
+                          const mNum = item.month.includes('-') 
+                            ? parseInt(item.month.split('-')[1], 10) 
+                            : parseInt(item.month, 10);
+                          const validMonth = !isNaN(mNum) && mNum >= 1 && mNum <= 12 ? mNum - 1 : 0;
+                          return format(new Date(item.year || new Date().getFullYear(), validMonth, 1), 'MMM yyyy');
+                        })()}
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(item.status)}>
-                          {getStatusIcon(item.status)} {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        <Badge className={`${getStatusColor(item.status)} border`}>
+                          {getStatusIcon(item.status)} {getStatusLabel(item.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-semibold">{formatCurrency(item.amount)}</TableCell>
                       {/* <TableCell>{formatCurrency(item.platformFee)}</TableCell>
                       <TableCell className="text-green-600 font-semibold">{formatCurrency(item.instructorShare)}</TableCell>
                       <TableCell>{formatCurrency(item.taxAmount)}</TableCell> */}
-                      <TableCell>{Math.round(item.watchTimeMinutes / 60)}h {item.watchTimeMinutes % 60}m</TableCell>
+                      <TableCell>{formatWatchTime(item.watchTimeMinutes)}</TableCell>
                       <TableCell>{item.courseCount}</TableCell>
                       <TableCell>{formatDate(item.requestDate)}</TableCell>
                       <TableCell>{formatDate(item.processedDate)}</TableCell>
