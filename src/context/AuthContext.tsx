@@ -17,6 +17,7 @@ interface CustomUser {
   AccessToken?: string;
   ProfileImage?: string;
   allowBecomingInstructor?: boolean;
+  isProfileComplete?: boolean;
 }
 
 interface AuthContextType {
@@ -24,6 +25,8 @@ interface AuthContextType {
   loading: boolean;
   logout: () => Promise<void>;
   refreshAuth: () => void;
+  isProfileComplete: boolean;
+  setProfileComplete: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,11 +34,14 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   logout: async () => { },
   refreshAuth: () => { },
+  isProfileComplete: true,
+  setProfileComplete: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
   // Check for user in localStorage and Firebase
   const checkAuthState = () => {
@@ -59,9 +65,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           AccessToken: userData.AccessToken,
           ProfileImage: userData.ProfileImage || userData.profileImage,
           allowBecomingInstructor: userData.AllowBecomingInstructor || false,
+          isProfileComplete: userData.IsProfileComplete !== false,
         };
 
         setUser(customUser);
+        setIsProfileComplete(userData.IsProfileComplete !== false);
         setLoading(false);
         return;
       } else {
@@ -157,8 +165,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuthState();
   };
 
+  const setProfileComplete = () => {
+    setIsProfileComplete(true);
+    // Also update the user object
+    if (user) {
+      setUser({ ...user, isProfileComplete: true });
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, logout, refreshAuth }}>
+    <AuthContext.Provider value={{ user, loading, logout, refreshAuth, isProfileComplete, setProfileComplete }}>
       {children}
     </AuthContext.Provider>
   );

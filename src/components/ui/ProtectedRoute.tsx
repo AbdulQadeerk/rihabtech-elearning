@@ -1,13 +1,14 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ProfileCompletionModal from './ProfileCompletionModal';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isProfileComplete, setProfileComplete } = useAuth();
   const token = localStorage.getItem('token');
   
   if (loading) {
@@ -22,7 +23,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
   
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {!isProfileComplete && user && (
+        <ProfileCompletionModal
+          userName={user.name || user.displayName || ''}
+          userEmail={user.email || user.UserName || ''}
+          onComplete={() => {
+            setProfileComplete();
+            // Force a page reload to refresh the user data
+            window.location.reload();
+          }}
+        />
+      )}
+    </>
+  );
 };
 
-export default ProtectedRoute; 
+export default ProtectedRoute;

@@ -91,14 +91,22 @@ export const GoogleAuth = {
         localStorage.setItem('token', typeof userData === 'string' ? userData : JSON.stringify(userData));
         console.log('✅ Token saved to localStorage');
 
+        // Check if profile is complete
+        const parsedData = typeof userData === 'string' ? JSON.parse(userData) : userData;
+        const isProfileComplete = parsedData.IsProfileComplete !== false;
+
         // Show success message
         toast.success('Login successful!');
 
         // Clean up OAuth callback parameters and redirect to hash route
         // Simple redirect that works with HashRouter
         setTimeout(() => {
-          // Clear URL completely and set hash route
-          window.location.replace(window.location.origin + '/#/learner/homepage');
+          if (!isProfileComplete) {
+            // Redirect to homepage where the profile completion modal will show
+            window.location.replace(window.location.origin + '/#/learner/homepage');
+          } else {
+            window.location.replace(window.location.origin + '/#/learner/homepage');
+          }
         }, 500); // Small delay to ensure toast is visible
       } else {
         // Google login failed

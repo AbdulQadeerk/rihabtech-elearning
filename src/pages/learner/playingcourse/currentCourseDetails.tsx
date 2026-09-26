@@ -974,23 +974,35 @@ export default function CourseDetailsPage() {
             const incrementalWatchTime = Math.floor(totalWatched - lastPayoutWatchTimeRef.current);
 
             try {
-              await progressApiService.updateLectureProgress({
-                courseId: courseIdNum,
-                sectionId: sectionId,
-                lectureId: lectureId,
-                currentPosition: currentPosition,
-                watchTime: totalWatched,
-                isCompleted: false
-              });
-
-              // Record incremental watch time for minute categorization and instructor payout
               if (incrementalWatchTime > 0) {
+                await progressApiService.updateLectureProgress({
+                  courseId: courseIdNum,
+                  sectionId: sectionId,
+                  lectureId: lectureId,
+                  currentPosition: currentPosition,
+                  watchTime: incrementalWatchTime, // Send delta to prevent quadratic growth
+                  isCompleted: false
+                });
+
+                // Update last recorded watch time immediately after progress API succeeds
+                // to prevent double-counting if instructor payout API fails
+                lastPayoutWatchTimeRef.current = totalWatched;
+
+                // Record incremental watch time for minute categorization and instructor payout
                 try {
                   await instructorPayoutApiService.recordWatchTime(courseIdNum, lectureId, incrementalWatchTime);
-                  lastPayoutWatchTimeRef.current = totalWatched; // Update last recorded watch time
                 } catch (watchTimeError) {
                   console.error('Error recording watch time:', watchTimeError);
                 }
+              } else {
+                await progressApiService.updateLectureProgress({
+                  courseId: courseIdNum,
+                  sectionId: sectionId,
+                  lectureId: lectureId,
+                  currentPosition: currentPosition,
+                  watchTime: 0,
+                  isCompleted: false
+                });
               }
 
               // After updating lecture progress, refresh overall progress to ensure it's up to date
