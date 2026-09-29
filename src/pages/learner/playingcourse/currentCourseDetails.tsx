@@ -308,6 +308,7 @@ export default function CourseDetailsPage() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   // Watch time tracking states
   const [totalWatched, setTotalWatched] = useState(0); // in seconds
+  const totalWatchedRef = useRef<number>(0);
   type WatchSession = {
     start: number;
     startedAt: string;
@@ -811,7 +812,9 @@ export default function CourseDetailsPage() {
     // Load any previously saved watch data from localStorage or your backend
     const savedWatchTime = localStorage.getItem(`watchTime-${courseId}-${studentId}`);
     if (savedWatchTime) {
-      setTotalWatched(parseFloat(savedWatchTime));
+      const parsedWatchTime = parseFloat(savedWatchTime);
+      setTotalWatched(parsedWatchTime);
+      totalWatchedRef.current = parsedWatchTime;
     }
 
     // Set up periodic reporting of watch time
@@ -907,7 +910,6 @@ export default function CourseDetailsPage() {
 
     const startTime = playerRef.current?.getCurrentTime() || currentTime || 0;
     lastPlayTimeRef.current = startTime;
-    lastPayoutWatchTimeRef.current = 0; // Reset payout watch time tracking when starting new session
 
     try {
       const courseIdNum = parseInt(courseId);
@@ -949,11 +951,10 @@ export default function CourseDetailsPage() {
       if (lastPlayTimeRef.current !== null) {
         const timeDiff = currentPosition - lastPlayTimeRef.current;
         if (timeDiff > 0 && timeDiff < 2) { // Only count forward progress, max 2 seconds per update
-          setTotalWatched(prev => {
-            const newTotal = prev + timeDiff;
-            // Cap at video duration
-            return duration > 0 ? Math.min(newTotal, duration) : newTotal;
-          });
+          const newTotal = totalWatchedRef.current + timeDiff;
+          const cappedTotal = duration > 0 ? Math.min(newTotal, duration) : newTotal;
+          totalWatchedRef.current = cappedTotal;
+          setTotalWatched(cappedTotal);
         }
       }
       lastPlayTimeRef.current = currentPosition;
@@ -975,7 +976,7 @@ export default function CourseDetailsPage() {
 
           if (!isNaN(courseIdNum) && sectionId && !isNaN(lectureId)) {
             // Calculate incremental watch time since last payout recording
-            const incrementalWatchTime = Math.floor(totalWatched - lastPayoutWatchTimeRef.current);
+            const incrementalWatchTime = Math.floor(totalWatchedRef.current - lastPayoutWatchTimeRef.current);
 
             try {
               if (incrementalWatchTime > 0) {
@@ -990,7 +991,7 @@ export default function CourseDetailsPage() {
 
                 // Update last recorded watch time immediately after progress API succeeds
                 // to prevent double-counting if instructor payout API fails
-                lastPayoutWatchTimeRef.current = totalWatched;
+                lastPayoutWatchTimeRef.current = totalWatchedRef.current;
 
                 // Record incremental watch time for minute categorization and instructor payout
                 try {
@@ -1149,7 +1150,7 @@ export default function CourseDetailsPage() {
 
           // Record any remaining watch time when video ends (no minimum threshold)
           // For very short videos, record the full duration if no incremental time was recorded
-          const watchTimeToRecord = finalIncrementalWatchTime > 0 ? finalIncrementalWatchTime : Math.floor(finalWatchTime);
+          const watchTimeToRecord = finalIncrementalWatchTime > 0 ? finalIncrementalWatchTime : 0;
 
           if (watchTimeToRecord > 0) {
             try {
@@ -1227,6 +1228,8 @@ export default function CourseDetailsPage() {
         });
         setCurrentTime(0);
         setTotalWatched(0);
+        totalWatchedRef.current = 0;
+        lastPayoutWatchTimeRef.current = 0;
         setIsPlaying(true);
       }, 1000);
     }
@@ -1352,7 +1355,9 @@ export default function CourseDetailsPage() {
               if (isPlaying && lastPlayTimeRef.current !== null) {
                 const timeDiff = playedSeconds - lastPlayTimeRef.current;
                 if (timeDiff > 0 && timeDiff < 2) { // Only count forward progress, max 2 seconds per update
-                  setTotalWatched(prev => Math.min(prev + timeDiff, duration || Infinity));
+                  const cappedTotal = Math.min(totalWatchedRef.current + timeDiff, duration || Infinity);
+                  totalWatchedRef.current = cappedTotal;
+                  setTotalWatched(cappedTotal);
                 }
               }
               lastPlayTimeRef.current = playedSeconds;
@@ -1361,6 +1366,8 @@ export default function CourseDetailsPage() {
               setDuration(dur);
               // Reset total watched when duration changes (new video)
               setTotalWatched(0);
+              totalWatchedRef.current = 0;
+              lastPayoutWatchTimeRef.current = 0;
               // Reset video completed flag when duration changes (new video)
               videoCompletedRef.current = false;
             }}
@@ -1615,6 +1622,8 @@ export default function CourseDetailsPage() {
                     });
                     setCurrentTime(0);
                     setTotalWatched(0);
+                    totalWatchedRef.current = 0;
+                    lastPayoutWatchTimeRef.current = 0;
                     setIsPlaying(true);
                   }}
                   className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-semibold transition-colors"
