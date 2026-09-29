@@ -64,10 +64,14 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
       console.log('Processing curriculum for preview videos:', course.curriculum);
       const videos: PreviewVideo[] = [];
 
-      course.curriculum.sections.forEach(section => {
+      course.curriculum.sections
+        .filter(section => section && !(section as any).isDeleted && (section as any).pendingChangeType !== 'DELETE')
+        .forEach(section => {
         console.log('Processing section:', section.name, section);
         if (section.items) {
-          section.items.forEach(item => {
+          section.items
+            .filter(item => item && !(item as any).isDeleted && (item as any).pendingChangeType !== 'DELETE')
+            .forEach(item => {
             console.log('Processing item:', item);
             console.log('Item isPromotional value:', item.isPromotional);
             console.log('Item isPromotional type:', typeof item.isPromotional);
@@ -238,6 +242,12 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
     console.error('Selected video:', selectedVideo);
     console.error('Video URL:', selectedVideo?.videoUrl);
 
+    // Ignore non-fatal HLS errors or errors when the video might still play
+    if (error && typeof error === 'string' && error.includes('hlsError')) {
+      console.warn('Ignored HLS error:', error);
+      return;
+    }
+
     // Check if it's a YouTube video
     const isYouTube = selectedVideo?.videoUrl?.includes('youtube.com') || selectedVideo?.videoUrl?.includes('youtu.be');
     if (isYouTube) {
@@ -310,19 +320,34 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
                   )}
 
                   {videoError && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
-                      <div className="text-center text-white">
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 z-10">
+                      <div className="text-center text-white p-6 bg-gray-800 rounded-lg relative">
+                        <button 
+                          onClick={() => setVideoError(null)}
+                          className="absolute top-2 right-2 text-gray-400 hover:text-white"
+                          title="Dismiss Error"
+                        >
+                          <X size={20} />
+                        </button>
                         <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
                           <Video size={32} />
                         </div>
                         <p className="mb-2 text-lg">Error loading video</p>
                         <p className="text-sm mb-4 text-gray-300">{videoError}</p>
-                        <button
-                          onClick={handleRetry}
-                          className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
-                        >
-                          Retry
-                        </button>
+                        <div className="flex gap-4 justify-center">
+                          <button
+                            onClick={handleRetry}
+                            className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                          >
+                            Retry
+                          </button>
+                          <button
+                            onClick={() => setVideoError(null)}
+                            className="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition-colors"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -335,6 +360,7 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
                     className="rounded-lg"
                     playing={true}
                     onReady={handleVideoReady}
+                    onPlay={() => setVideoError(null)}
                     onError={handleVideoError}
                     onEnded={() => {
                       const currentIndex = previewVideos.findIndex(v => v.id === selectedVideo.id);

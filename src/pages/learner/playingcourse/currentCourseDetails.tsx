@@ -152,13 +152,17 @@ export default function CourseDetailsPage() {
           requirements: apiData.requirements || [],
           target: apiData.target || [],
           curriculum: apiData.curriculum ? {
-            sections: apiData.curriculum.sections.map((section: any, sectionIndex: number) => ({
+            sections: (apiData.curriculum.sections || [])
+              .filter((section: any) => section && !section.isDeleted && section.pendingChangeType !== 'DELETE')
+              .map((section: any, sectionIndex: number) => ({
               id: section.id || section.name || `section-${sectionIndex}`,
               sectionId: section.id,
               name: section.name,
               published: section.published,
               seqNo: section.seqNo,
-              items: section.items.map((item: any, itemIndex: number) => {
+              items: (section.items || [])
+                .filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
+                .map((item: any, itemIndex: number) => {
                 // Determine contentType from type if contentType is not provided
                 let contentType = item.contentType;
                 if (!contentType && item.type) {
@@ -2074,7 +2078,9 @@ export default function CourseDetailsPage() {
 
     return (
       <div className="space-y-1">
-        {curriculumData.sections.map((section: any, sectionIndex: number) => {
+        {curriculumData.sections
+          ?.filter((section: any) => section && !section.isDeleted && section.pendingChangeType !== 'DELETE')
+          ?.map((section: any, sectionIndex: number) => {
           const sectionId = section.id || sectionIndex.toString();
           const isExpanded = expandedSections[sectionId] !== undefined ? expandedSections[sectionId] : true; // Default to expanded
 
@@ -2124,7 +2130,9 @@ export default function CourseDetailsPage() {
               {/* Section Items */}
               {isExpanded && (
                 <div className="bg-gray-50">
-                  {section.items?.map((module: any, itemIndex: number) => {
+                  {section.items
+                    ?.filter((module: any) => module && !module.isDeleted && module.pendingChangeType !== 'DELETE')
+                    ?.map((module: any, itemIndex: number) => {
                     const isActive = activeModule?.sectionIndex === sectionIndex && activeModule?.itemIndex === itemIndex;
                     const moduleType = (module as any).type || module.contentType;
                     const hasQuestions = (module as any).questions && (module as any).questions.length > 0;

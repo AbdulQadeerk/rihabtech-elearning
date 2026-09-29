@@ -199,7 +199,7 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userNam
               >
                 <SelectValue placeholder="Select Gender" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10000]">
                 <SelectItem value="Male">Male</SelectItem>
                 <SelectItem value="Female">Female</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>

@@ -51,12 +51,15 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
       ];
     }
 
-    return course.curriculum.sections.map((section, index) => {
+    return course.curriculum.sections
+      .filter(section => section && !(section as any).isDeleted && (section as any).pendingChangeType !== 'DELETE')
+      .map((section, index) => {
       let totalDurationSeconds = 0;
       console.log(`Processing section: ${section.name} with ${section.items?.length || 0} items`);
       
-      if (section.items) {
-        section.items.forEach((item, itemIndex) => {
+      const activeItems = (section.items || []).filter(item => item && !(item as any).isDeleted && (item as any).pendingChangeType !== 'DELETE');
+      if (activeItems.length > 0) {
+        activeItems.forEach((item, itemIndex) => {
           console.log(`Processing item ${itemIndex}:`, item.lectureName, 'Type:', item.contentType);
           console.log(`Item contentFiles:`, item.contentFiles);
           
@@ -102,7 +105,7 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
       
       console.log(`Section ${section.name}: Final formatted duration: ${totalDuration}`);
 
-      const lectures: Lecture[] = section.items ? section.items.map(item => {
+      const lectures: Lecture[] = activeItems.map(item => {
         console.log(`Processing item:`, item);
         console.log(`Item isPromotional:`, item.isPromotional);
         console.log(`Item contentFiles:`, item.contentFiles);
@@ -204,7 +207,7 @@ export default function Curriculum({ course, onPreviewCourse,lectureIndex,sectio
            contentFiles: item.contentFiles,
            isPromotional: item.isPromotional || false
          };
-      }) : [];
+      });
 
       return {
         title: section.name || `Section ${index + 1}`,

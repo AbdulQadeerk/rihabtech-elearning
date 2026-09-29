@@ -198,12 +198,16 @@ export const transformCurriculumForUpdate = (curriculum: any): CourseUpdateReque
   if (!curriculum || !curriculum.sections) return undefined;
   
   return {
-    sections: curriculum.sections.map((section: any) => ({
+    sections: curriculum.sections
+      .filter((section: any) => section && !section.isDeleted && section.pendingChangeType !== 'DELETE')
+      .map((section: any) => ({
       ...(section.id !== undefined && { id: section.id }),
       name: section.name,
       published: section.published !== undefined ? section.published : true,
       seqNo: section.seqNo || 1,
-      items: section.items?.map((item: any) => {
+      items: section.items
+        ?.filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
+        ?.map((item: any) => {
         const transformedItem: any = {
           ...(item.id !== undefined && { id: item.id }),
           type: item.type,

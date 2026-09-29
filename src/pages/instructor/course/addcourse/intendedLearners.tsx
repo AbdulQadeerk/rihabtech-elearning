@@ -175,6 +175,8 @@ export function IntendentLearners({ onSubmit }: any) {
           toast.error("You don't have permission to perform this action.");
         } else if (error.message?.includes('Server error')) {
           toast.error("Server error. Please try again later.");
+        } else if (error.message) {
+          toast.error(error.message);
         } else {
           toast.error("Failed to save course intended learners. Please try again.");
         }

@@ -497,6 +497,7 @@ function stripFilesFromCurriculum(curriculum: any, forApiSubmission: boolean = f
           if (key === 'sections' && Array.isArray(obj[key])) {
             newObj[key] = obj[key].map((section: any, sectionIndex: number) => {
               if (!section) return null;
+              if (section.isDeleted || section.pendingChangeType === 'DELETE') return null;
 
               const { id, name, published, seqNo, items, isNew, isEdited, pendingChangeType, isDeleted } = section;
 
@@ -529,6 +530,7 @@ function stripFilesFromCurriculum(curriculum: any, forApiSubmission: boolean = f
           else if (key === 'items' && Array.isArray(obj[key])) {
             newObj[key] = obj[key].map((item: any, itemIndex: number) => {
               if (!item) return null;
+              if (item.isDeleted || item.pendingChangeType === 'DELETE') return null;
 
               const { id, type, lectureName, description, contentType, contentUrl, contentText, articleSource, videoSource, isPromotional, duration, published, seqNo, contentFiles, resources, sectionId, quizTitle, quizDescription, title: assignmentTitle, totalMarks, questions, isNew, isEdited, pendingChangeType } = item;
 
@@ -843,10 +845,12 @@ const sortCurriculumBySeqNo = (curriculum: any) => {
   return {
     ...curriculum,
     sections: curriculum.sections
+      ?.filter((s: any) => s && !s.isDeleted && s.pendingChangeType !== 'DELETE')
       ?.sort((a: any, b: any) => (a.seqNo || 0) - (b.seqNo || 0))
       ?.map((section: any) => ({
         ...section,
         items: section.items
+          ?.filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
           ?.sort((a: any, b: any) => (a.seqNo || 0) - (b.seqNo || 0))
       }))
   };
@@ -858,7 +862,9 @@ const transformApiCurriculumToForm = (curriculum: any) => {
 
   return {
     ...curriculum,
-    sections: curriculum.sections.map((section: any, sectionIndex: number) => ({
+    sections: curriculum.sections
+      .filter((section: any) => section && !section.isDeleted && section.pendingChangeType !== 'DELETE')
+      .map((section: any, sectionIndex: number) => ({
       ...section,
       seqNo: section.seqNo != null ? section.seqNo : (sectionIndex + 1),
       published: section.published !== undefined ? section.published : true,
@@ -867,7 +873,9 @@ const transformApiCurriculumToForm = (curriculum: any) => {
       isEdited: section.isEdited,
       pendingChangeType: section.pendingChangeType,
       isDeleted: section.isDeleted, // Preserve isDeleted property
-      items: section.items ? section.items.map((item: any, itemIndex: number) => {
+      items: section.items ? section.items
+        .filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
+        .map((item: any, itemIndex: number) => {
         // Transform based on item type
         const transformedItem: any = {
           ...item,
@@ -1748,6 +1756,8 @@ export function CourseCarriculam({ onSubmit }: any) {
           toast.error("You don't have permission to perform this action.");
         } else if (error.message?.includes('Server error')) {
           toast.error("Server error. Please try again later.");
+        } else if (error.message) {
+          toast.error(error.message);
         } else {
           toast.error("Failed to save curriculum. Please try again.");
         }
@@ -2704,7 +2714,7 @@ export function CourseCarriculam({ onSubmit }: any) {
                                               >
                                                 {/* Render items - use actual index to keep drag positions correct */}
                                                 {Array.isArray(section.items) && section.items.map((item, itemIdx) => {
-                                                  if (!item) return null;
+                                                  if (!item || item.isDeleted || item.pendingChangeType === 'DELETE') return null;
                                                   return (
                                                     <Draggable
                                                       key={`item-${sectionIdx}-${item.id || item.seqNo || itemIdx}-${itemIdx}`}

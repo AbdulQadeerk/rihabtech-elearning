@@ -375,7 +375,9 @@ const PreviewCourse = () => {
         <h3 className="text-xl font-bold flex items-center gap-2 mb-2"><Info className="inline-block text-purple-500" /> Curriculum</h3>
         {course.curriculum && course.curriculum.sections && course.curriculum.sections.length > 0 ? (
           <div className="space-y-4">
-            {course.curriculum.sections.map((section: any, sectionIdx: number) => (
+            {course.curriculum.sections
+              .filter((section: any) => section && !section.isDeleted && section.pendingChangeType !== 'DELETE')
+              .map((section: any, sectionIdx: number) => (
               <div key={sectionIdx} className="border rounded-lg bg-gray-50 overflow-hidden">
                 <div 
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors"
@@ -398,7 +400,9 @@ const PreviewCourse = () => {
                     <div className="ml-2">
                       {section.items && section.items.length > 0 ? (
                         <ul className="list-disc ml-4">
-                      {section.items.map((item: any, itemIdx: number) => (
+                      {section.items
+                        .filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
+                        .map((item: any, itemIdx: number) => (
                         <li key={itemIdx} className="mb-2">
                           <div className="flex items-center gap-2 mb-1">
                             <div className="font-semibold text-gray-800 capitalize">{item.type === 'lecture' ? 'Lecture' : item.type === 'quiz' ? 'Quiz' : item.type === 'assignment' ? 'Assignment' : 'Item'}: {item.lectureName || item.quizTitle || item.title || ''}</div>

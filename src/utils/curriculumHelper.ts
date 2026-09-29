@@ -4,11 +4,15 @@ export const transformApiCurriculumToForm = (curriculum: any) => {
   
   return {
     ...curriculum,
-    sections: curriculum.sections.map((section: any, sectionIndex: number) => ({
+    sections: curriculum.sections
+      .filter((section: any) => section && !section.isDeleted && section.pendingChangeType !== 'DELETE')
+      .map((section: any, sectionIndex: number) => ({
       ...section,
       seqNo: section.seqNo != null ? section.seqNo : (sectionIndex + 1),
       published: section.published !== undefined ? section.published : true,
-      items: section.items ? section.items.map((item: any, itemIndex: number) => {
+      items: section.items ? section.items
+        .filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
+        .map((item: any, itemIndex: number) => {
         // Transform based on item type
         const transformedItem: any = {
           ...item,
@@ -129,10 +133,12 @@ export const sortCurriculumBySeqNo = (curriculum: any) => {
   return {
     ...curriculum,
     sections: curriculum.sections
+      ?.filter((s: any) => s && !s.isDeleted && s.pendingChangeType !== 'DELETE')
       ?.sort((a: any, b: any) => (a.seqNo || 0) - (b.seqNo || 0))
       ?.map((section: any) => ({
         ...section,
         items: section.items
+          ?.filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
           ?.sort((a: any, b: any) => (a.seqNo || 0) - (b.seqNo || 0))
       }))
   };
@@ -159,7 +165,9 @@ export const stripFilesFromCurriculumForStorage = (curriculum: any): any => {
           
           // Special handling for sections
           if (key === 'sections' && Array.isArray(obj[key])) {
-            newObj[key] = obj[key].map((section: any, sectionIndex: number) => {
+            newObj[key] = obj[key]
+              .filter((s: any) => s && !s.isDeleted && s.pendingChangeType !== 'DELETE')
+              .map((section: any, sectionIndex: number) => {
               if (!section) return null;
               
               const { id, name, published, items } = section;
@@ -176,7 +184,9 @@ export const stripFilesFromCurriculumForStorage = (curriculum: any): any => {
           }
           // Special handling for items
           else if (key === 'items' && Array.isArray(obj[key])) {
-            newObj[key] = obj[key].map((item: any, itemIndex: number) => {
+            newObj[key] = obj[key]
+              .filter((item: any) => item && !item.isDeleted && item.pendingChangeType !== 'DELETE')
+              .map((item: any, itemIndex: number) => {
               if (!item) return null;
               
               const { id, type, lectureName, description, contentType, contentUrl, articleSource, videoSource, isPromotional, duration, published, contentFiles, resources, quizTitle, quizDescription, title, totalMarks, questions } = item;
