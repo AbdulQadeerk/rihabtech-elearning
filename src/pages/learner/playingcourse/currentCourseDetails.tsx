@@ -1312,6 +1312,16 @@ export default function CourseDetailsPage() {
   const renderVideoPlayer = (module: any) => {
     let videoUrl = convertYouTubeUrl(module.contentUrl || module.contentFiles?.[0]?.url || "");
     
+    // Fix broken Cloud Fundamentals video ID (temporary hack until db syncs everywhere)
+    if (videoUrl.includes('3c29aa5b-f97a-4535-ad6b-8db6c2554be2')) {
+      videoUrl = videoUrl.replace('3c29aa5b-f97a-4535-ad6b-8db6c2554be2', '2ee2caa4-725a-47fe-a381-237308ca2b3c');
+    }
+
+    // Convert Bunny direct MP4 URLs to HLS playlists for robust streaming
+    if (videoUrl.includes('.b-cdn.net') && (videoUrl.endsWith('.mp4') || videoUrl.includes('/play.mp4') || videoUrl.includes('/720.mp4'))) {
+      videoUrl = videoUrl.replace(/\/[^\/]+\.mp4$/, '/playlist.m3u8');
+    }
+    
     // Try to find a specific file for the selected resolution
     if (module.contentFiles && module.contentFiles.length > 0 && resolution !== "Auto") {
       const resFile = module.contentFiles.find((f: any) => 
@@ -1409,6 +1419,7 @@ export default function CourseDetailsPage() {
                 }
               },
               file: {
+                forceHLS: videoUrl.includes('.m3u8') || videoUrl.includes('.b-cdn.net'),
                 attributes: {
                   controlsList: 'nodownload',
                   onContextMenu: (e: any) => e.preventDefault()

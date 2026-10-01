@@ -1022,6 +1022,11 @@ export default function CourseDetails() {
                   className="rounded-md mb-4 z-[999]"
                   height={'220px'}
                   width={'320px'}
+                  config={{
+                    file: {
+                      forceHLS: course.promoVideoUrl?.includes('.m3u8') || course.promoVideoUrl?.includes('.b-cdn.net')
+                    }
+                  }}
                 />
               ) : (
                 <img 

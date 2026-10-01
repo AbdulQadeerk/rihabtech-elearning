@@ -430,11 +430,22 @@ const PreviewCourse = () => {
                                         {f.contentType === 'video' || item.contentType === 'video' ? (
                                           <div className="rounded overflow-hidden mt-2" style={{ maxWidth: 320 }}>
                                             <ReactPlayer
-                                              url={f.url || item.url}
+                                              url={(() => {
+                                                let u = f.url || item.url || '';
+                                                if (u.includes('.b-cdn.net') && (u.endsWith('.mp4') || u.includes('/play.mp4') || u.includes('/720.mp4'))) {
+                                                  u = u.replace(/\/[^\/]+\.mp4$/, '/playlist.m3u8');
+                                                }
+                                                return u;
+                                              })()}
                                               controls={true}
                                               width="320px"
                                               height="180px"
                                               light={item.thumbnailUrl || false}
+                                              config={{
+                                                file: {
+                                                  forceHLS: (f.url || item.url || '').includes('.m3u8') || (f.url || item.url || '').includes('.b-cdn.net')
+                                                }
+                                              }}
                                             />
                                           </div>
                                         ) : null}
@@ -589,10 +600,21 @@ const PreviewCourse = () => {
                   <span className="font-semibold">Promotional Video:</span><br />
                   <div className="rounded overflow-hidden mt-2" style={{ maxWidth: 320 }}>
                     <ReactPlayer
-                      url={course.promoVideoUrl}
+                      url={(() => {
+                        let u = course.promoVideoUrl || '';
+                        if (u.includes('.b-cdn.net') && (u.endsWith('.mp4') || u.includes('/play.mp4') || u.includes('/720.mp4'))) {
+                          u = u.replace(/\/[^\/]+\.mp4$/, '/playlist.m3u8');
+                        }
+                        return u;
+                      })()}
                       controls={true}
                       width="320px"
                       height="180px"
+                      config={{
+                        file: {
+                          forceHLS: (course.promoVideoUrl || '').includes('.m3u8') || (course.promoVideoUrl || '').includes('.b-cdn.net')
+                        }
+                      }}
                     />
                   </div>
                 </div>

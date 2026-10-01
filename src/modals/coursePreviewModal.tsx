@@ -27,9 +27,19 @@ const convertYouTubeUrl = (url: string): string => {
 const getVideoUrl = (url: string): string => {
   if (!url) return url;
 
+  // Fix broken Cloud Fundamentals video ID (temporary hack until db syncs everywhere)
+  if (url.includes('3c29aa5b-f97a-4535-ad6b-8db6c2554be2')) {
+    url = url.replace('3c29aa5b-f97a-4535-ad6b-8db6c2554be2', '2ee2caa4-725a-47fe-a381-237308ca2b3c');
+  }
+
   // If it's a YouTube URL, convert it
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     return convertYouTubeUrl(url);
+  }
+
+  // Convert Bunny direct MP4 URLs to HLS playlists for robust streaming
+  if (url.includes('.b-cdn.net') && (url.endsWith('.mp4') || url.includes('/play.mp4') || url.includes('/720.mp4'))) {
+    return url.replace(/\/[^\/]+\.mp4$/, '/playlist.m3u8');
   }
 
   // For Bunny Stream or other URLs, return as is (assumed correct format)
@@ -377,6 +387,7 @@ export default function CoursePreviewModal({ isOpen, onClose, course, instructor
                         }
                       },
                       file: {
+                        forceHLS: getVideoUrl(selectedVideo.videoUrl).includes('.m3u8') || getVideoUrl(selectedVideo.videoUrl).includes('.b-cdn.net'),
                         attributes: {
                           controlsList: 'nodownload',
                           onContextMenu: (e: any) => e.preventDefault()
