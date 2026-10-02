@@ -584,7 +584,7 @@ export default function CourseDetailsPage() {
   // Save progress on browser close/unload
   useEffect(() => {
     const handleBeforeUnload = async () => {
-      if (courseId && activeModule?.id && !isPlaying) {
+      if (courseId && activeModule?.id && !isPlaying && (activeModule?.contentType === 'video' || activeModule?.contentType === 'lecture' || activeModule?.type === 'lecture')) {
         try {
           const courseIdNum = parseInt(courseId);
           const lectureId = typeof activeModule.id === 'string' ? parseInt(activeModule.id) : activeModule.id;
@@ -746,7 +746,8 @@ export default function CourseDetailsPage() {
   const selectModule = (sectionIndex: number, itemIndex: number, module: any) => {
     // Reset video completed flag when selecting a new module
     videoCompletedRef.current = false;
-    setActiveModule({ ...module, sectionIndex, itemIndex, });
+    const resolvedSectionId = module.sectionId || enrichedCourseData?.curriculum?.sections?.[sectionIndex]?.id || courseData?.curriculum?.sections?.[sectionIndex]?.id;
+    setActiveModule({ ...module, sectionIndex, itemIndex, sectionId: resolvedSectionId });
     // Reset video state when switching modules
     if (module.contentType === 'video' || module.contentType === 'lecture') {
       handleLectureClick(sectionIndex, itemIndex, module);
@@ -980,14 +981,18 @@ export default function CourseDetailsPage() {
 
             try {
               if (incrementalWatchTime > 0) {
-                await progressApiService.updateLectureProgress({
-                  courseId: courseIdNum,
-                  sectionId: sectionId,
-                  lectureId: lectureId,
-                  currentPosition: currentPosition,
-                  watchTime: incrementalWatchTime, // Send delta to prevent quadratic growth
-                  isCompleted: false
-                });
+                try {
+                  await progressApiService.updateLectureProgress({
+                    courseId: courseIdNum,
+                    sectionId: sectionId,
+                    lectureId: lectureId,
+                    currentPosition: currentPosition,
+                    watchTime: incrementalWatchTime, // Send delta to prevent quadratic growth
+                    isCompleted: false
+                  });
+                } catch (progressError) {
+                  console.warn('Student progress failed, but continuing to record payout...', progressError);
+                }
 
                 // Update last recorded watch time immediately after progress API succeeds
                 // to prevent double-counting if instructor payout API fails
@@ -1000,14 +1005,18 @@ export default function CourseDetailsPage() {
                   console.error('Error recording watch time:', watchTimeError);
                 }
               } else {
-                await progressApiService.updateLectureProgress({
-                  courseId: courseIdNum,
-                  sectionId: sectionId,
-                  lectureId: lectureId,
-                  currentPosition: currentPosition,
-                  watchTime: 0,
-                  isCompleted: false
-                });
+                try {
+                  await progressApiService.updateLectureProgress({
+                    courseId: courseIdNum,
+                    sectionId: sectionId,
+                    lectureId: lectureId,
+                    currentPosition: currentPosition,
+                    watchTime: 0,
+                    isCompleted: false
+                  });
+                } catch (progressError) {
+                  console.warn('Student progress failed (zero incremental time)', progressError);
+                }
               }
 
               // After updating lecture progress, refresh overall progress to ensure it's up to date
@@ -1083,7 +1092,7 @@ export default function CourseDetailsPage() {
     stopWatchTimeTracking();
     // Persist current position on pause for resume
     try {
-      if (courseId && activeModule?.id) {
+      if (courseId && activeModule?.id && (activeModule?.contentType === 'video' || activeModule?.contentType === 'lecture' || activeModule?.type === 'lecture')) {
         const courseIdNum = parseInt(courseId);
         const lectureId = typeof activeModule.id === 'string' ? parseInt(activeModule.id) : activeModule.id;
         const sectionId = typeof activeModule.sectionId === 'string' ? parseInt(activeModule.sectionId) : activeModule.sectionId;
