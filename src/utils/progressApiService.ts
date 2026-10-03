@@ -161,7 +161,7 @@ class ProgressApiService {
       );
       return response.data.progress;
     } catch (error: any) {
-      console.error('Error updating lecture progress:', error);
+      console.error('Error updating lecture progress:', error.response?.data || error);
       throw error;
     }
   }
