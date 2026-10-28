@@ -1,4 +1,4 @@
-import { BarChart2, Calendar, ChevronDown } from "lucide-react"
+import { BarChart2, Calendar, ChevronDown, RefreshCw } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Button } from "../../../components/ui/button";
 import {
@@ -10,8 +10,8 @@ import {
     TableHeader,
     TableRow,
   } from "../../../components/ui/table";
-import { MouseEventHandler, useState, useEffect } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "../../../components/ui/select";
+import { MouseEventHandler, useState, useEffect, useRef, useCallback } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { useAuth } from "../../../context/AuthContext";
 import { dashboardService, DashboardStats, RevenueData } from "../../../utils/dashboardService";
 import { CourseDisplayData } from "../course/courseList";
@@ -44,6 +44,9 @@ const monthNames = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const currentYear = new Date().getFullYear();
+const yearsList = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
+
 export const Overview = () =>{
     const navigate = useNavigate();
     const [revenueMonthly, setRevenueMonthly] = useState<MonthlyRevenueSummary[]>([]);
@@ -53,6 +56,12 @@ export const Overview = () =>{
     const [courses, setCourses] = useState<CourseDisplayData[]>([]);
     const [courseWatchTimeData, setCourseWatchTimeData] = useState<CourseWatchTimeData[]>([]);
     const [watchTimePricingFilter, setWatchTimePricingFilter] = useState<'all' | 'paid' | 'free'>('all');
+
+    // Month and Year filter for Course-wise watch time
+    const [watchTimeMonth, setWatchTimeMonth] = useState<string>("all"); // "all" | "1".."12"
+    const [watchTimeYear, setWatchTimeYear] = useState<string>("all"); // "all" | "2026" | ...
+    const [watchTimeLoading, setWatchTimeLoading] = useState<boolean>(false);
+    const isWatchTimeInitialMount = useRef(true);
 
     const [selectedCourse, setSelectedCourse] = useState<string >('all-courses');
     const [loading, setLoading] = useState(true);
@@ -73,6 +82,46 @@ export const Overview = () =>{
         }
     };
 
+    const loadWatchTimeData = useCallback(async (monthVal: string, yearVal: string) => {
+        const instructorId = user?.UserName || user?.email;
+        if (!instructorId) return;
+
+        try {
+            setWatchTimeLoading(true);
+            const data = await courseWatchTimeService.getCourseWatchTimeData(
+                instructorId,
+                'all',
+                yearVal === 'all' ? null : yearVal,
+                monthVal === 'all' ? null : monthVal
+            );
+            setCourseWatchTimeData(data);
+        } catch (error) {
+            console.error('Error fetching course watch time data:', error);
+        } finally {
+            setWatchTimeLoading(false);
+        }
+    }, [user?.UserName, user?.email]);
+
+    useEffect(() => {
+        if (isWatchTimeInitialMount.current) {
+            isWatchTimeInitialMount.current = false;
+            return;
+        }
+        loadWatchTimeData(watchTimeMonth, watchTimeYear);
+    }, [watchTimeMonth, watchTimeYear, loadWatchTimeData]);
+
+    const handleSelectMonthFromChart = (monthName: string) => {
+        const mIndex = monthNames.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
+        if (mIndex !== -1) {
+            setWatchTimeMonth(String(mIndex + 1));
+            setWatchTimeYear(String(currentYear));
+            const el = document.getElementById("course-watch-time-section");
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    };
+
     useEffect(() => {
         const loadDashboardData = async () => {
             const instructorId = user?.UserName || user?.email; // Fallback for testing
@@ -88,7 +137,12 @@ export const Overview = () =>{
                 const [stats, revenue, watchTimeData] = await Promise.all([
                     dashboardService.getDashboardStats(instructorId,selectedCourse==='all-courses'?null:selectedCourse),
                     dashboardService.getRevenueStatistics(instructorId, new Date().getFullYear()),
-                    courseWatchTimeService.getCourseWatchTimeData(instructorId)
+                    courseWatchTimeService.getCourseWatchTimeData(
+                        instructorId,
+                        'all',
+                        watchTimeYear === 'all' ? null : watchTimeYear,
+                        watchTimeMonth === 'all' ? null : watchTimeMonth
+                    )
                 ]);
 
                 const revenueWithMonthNames = revenue.map((item) => {
@@ -281,7 +335,11 @@ export const Overview = () =>{
             period="Total Courses" 
           />
         </div>
-        <RevenueChart data={revenueStats} onClick={() => setShowMonthWiseReport((prev) => !prev)}/>
+        <RevenueChart 
+          data={revenueStats} 
+          onClick={() => setShowMonthWiseReport((prev) => !prev)}
+          onSelectMonth={handleSelectMonthFromChart}
+        />
         {showmonthWiseReport&&
             <MonthWiseReports data={revenueMonthly}/>
         }
@@ -307,67 +365,155 @@ export const Overview = () =>{
           const totalFilteredStudents = filteredCourses.reduce((sum, course) => sum + course.totalStudents, 0);
           const avgFilteredWatchTime = totalFilteredStudents > 0 ? totalFilteredWatchTime / totalFilteredStudents : 0;
 
+          const selectedPeriodLabel = (() => {
+            if (watchTimeMonth === 'all' && watchTimeYear === 'all') return 'All Time';
+            if (watchTimeMonth === 'all') return `Full Year ${watchTimeYear}`;
+            const monthNum = parseInt(watchTimeMonth, 10);
+            const monthTitle = monthNames[monthNum - 1] || watchTimeMonth;
+            if (watchTimeYear === 'all') return `${monthTitle} (All Years)`;
+            return `${monthTitle} ${watchTimeYear}`;
+          })();
+
           return (
-            <div className="mt-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="mt-8" id="course-watch-time-section">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Course-wise Watch Time</h2>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-2xl font-bold text-gray-900">Course-wise Watch Time</h2>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                      <Calendar className="w-3.5 h-3.5 text-orange-600" />
+                      {selectedPeriodLabel}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-500 mt-0.5">
                     Track performance, watch minutes, and student engagement across your courses
                   </p>
                 </div>
 
-                {/* Paid / Free Filter Controls */}
-                <div className="flex items-center p-1 bg-gray-100 rounded-xl border border-gray-200 self-start sm:self-auto">
-                  <button
-                    onClick={() => setWatchTimePricingFilter('all')}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
-                      watchTimePricingFilter === 'all'
-                        ? 'bg-white text-gray-900 shadow-xs'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <span>All Courses</span>
-                    <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-gray-200/80 text-gray-700">
-                      {courseWatchTimeData.length}
-                    </span>
-                  </button>
+                {/* Filters Area: Month, Year, and Course Type */}
+                <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+                  {/* Month Selector */}
+                  <div className="w-[145px]">
+                    <Select
+                      value={watchTimeMonth}
+                      onValueChange={(val) => {
+                        setWatchTimeMonth(val);
+                        if (val !== 'all' && watchTimeYear === 'all') {
+                          setWatchTimeYear(String(currentYear));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-xs bg-white border-gray-300 shadow-xs">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="all">All Months</SelectItem>
+                        {monthNames.map((name, idx) => (
+                          <SelectItem key={idx} value={String(idx + 1)}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  <button
-                    onClick={() => setWatchTimePricingFilter('paid')}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
-                      watchTimePricingFilter === 'paid'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-gray-600 hover:text-emerald-700'
-                    }`}
-                  >
-                    <span>Paid</span>
-                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
-                      watchTimePricingFilter === 'paid' ? 'bg-emerald-700/80 text-white' : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {paidCoursesCount}
-                    </span>
-                  </button>
+                  {/* Year Selector */}
+                  <div className="w-[115px]">
+                    <Select
+                      value={watchTimeYear}
+                      onValueChange={(val) => setWatchTimeYear(val)}
+                    >
+                      <SelectTrigger className="h-9 text-xs bg-white border-gray-300 shadow-xs">
+                        <SelectValue placeholder="Select Year" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="all">All Years</SelectItem>
+                        {yearsList.map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  <button
-                    onClick={() => setWatchTimePricingFilter('free')}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
-                      watchTimePricingFilter === 'free'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-gray-600 hover:text-blue-700'
-                    }`}
-                  >
-                    <span>Free</span>
-                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
-                      watchTimePricingFilter === 'free' ? 'bg-blue-700/80 text-white' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {freeCoursesCount}
-                    </span>
-                  </button>
+                  {/* All Time Reset Button */}
+                  {(watchTimeMonth !== 'all' || watchTimeYear !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setWatchTimeMonth('all');
+                        setWatchTimeYear('all');
+                      }}
+                      className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1 border border-gray-200"
+                      title="Reset to All Time"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>All Time</span>
+                    </button>
+                  )}
+
+                  {/* Paid / Free Filter Controls */}
+                  <div className="flex items-center p-1 bg-gray-100 rounded-xl border border-gray-200">
+                    <button
+                      onClick={() => setWatchTimePricingFilter('all')}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                        watchTimePricingFilter === 'all'
+                          ? 'bg-white text-gray-900 shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <span>All</span>
+                      <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-gray-200/80 text-gray-700">
+                        {courseWatchTimeData.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setWatchTimePricingFilter('paid')}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                        watchTimePricingFilter === 'paid'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-emerald-700'
+                      }`}
+                    >
+                      <span>Paid</span>
+                      <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+                        watchTimePricingFilter === 'paid' ? 'bg-emerald-700/80 text-white' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {paidCoursesCount}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setWatchTimePricingFilter('free')}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                        watchTimePricingFilter === 'free'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-blue-700'
+                      }`}
+                    >
+                      <span>Free</span>
+                      <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+                        watchTimePricingFilter === 'free' ? 'bg-blue-700/80 text-white' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {freeCoursesCount}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6 relative">
+                {/* Watch Time Loading Overlay */}
+                {watchTimeLoading && (
+                  <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center rounded-xl z-10 transition-opacity">
+                    <div className="flex items-center gap-2.5 px-4 py-2 bg-white rounded-lg shadow-md border border-gray-200">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                      <span className="text-xs font-medium text-gray-700">Loading {selectedPeriodLabel}...</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Dynamically Filtered Metric Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                   <div className="bg-blue-50/80 border border-blue-100 p-4 rounded-xl">
@@ -496,11 +642,15 @@ export const Overview = () =>{
                               </td>
                               <td className="px-5 py-3.5 whitespace-nowrap">
                                 <div className="text-xs text-gray-500">
-                                  {course.lastAccessed.toLocaleDateString('en-GB', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    year: 'numeric'
-                                  })}
+                                  {course.lastAccessed ? (
+                                    course.lastAccessed.toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })
+                                  ) : (
+                                    <span className="text-gray-400 italic">No activity</span>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -509,7 +659,7 @@ export const Overview = () =>{
                       ) : (
                         <tr>
                           <td colSpan={7} className="px-6 py-8 text-center text-gray-500 text-sm">
-                            No {watchTimePricingFilter === 'paid' ? 'paid' : watchTimePricingFilter === 'free' ? 'free' : ''} courses found with watch time.
+                            No {watchTimePricingFilter === 'paid' ? 'paid' : watchTimePricingFilter === 'free' ? 'free' : ''} courses found with watch time for {selectedPeriodLabel}.
                           </td>
                         </tr>
                       )}
@@ -554,9 +704,10 @@ const StatsCard = ({ title, value, growth, period }: StatsCardProps) => {
   interface RevenueChartProps {
       onClick: () => void;
       data: RevenueData[];
+      onSelectMonth?: (monthName: string) => void;
     }
 
-  const RevenueChart = ({ onClick, data }: RevenueChartProps) => {
+  const RevenueChart = ({ onClick, data, onSelectMonth }: RevenueChartProps) => {
     const chartData = data.map(item => ({
       month: item.month,
       value: item.revenue
@@ -574,7 +725,19 @@ const StatsCard = ({ title, value, growth, period }: StatsCardProps) => {
         </div>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} barSize={25} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+            <BarChart 
+              data={chartData} 
+              barSize={25} 
+              margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+              onClick={(state: any) => {
+                if (state && state.activePayload && state.activePayload.length > 0) {
+                  const m = state.activePayload[0].payload.month;
+                  if (m && onSelectMonth) {
+                    onSelectMonth(m);
+                  }
+                }
+              }}
+            >
               <XAxis dataKey="month" axisLine={false} tickLine={false} />
               <YAxis
               dataKey="revenue"
@@ -584,7 +747,13 @@ const StatsCard = ({ title, value, growth, period }: StatsCardProps) => {
                 tickFormatter={(value) => `₹${value / 1000}k`}
               />
               <CartesianGrid vertical={false} color="#bbb" strokeDasharray="0" />
-              <Bar dataKey="value" fill="#FF6B00" width={0.20} radius={[5, 5, 0, 0]} />
+              <Bar 
+                dataKey="value" 
+                fill="#FF6B00" 
+                width={0.20} 
+                radius={[5, 5, 0, 0]}
+                className="cursor-pointer hover:opacity-85 transition-opacity" 
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>

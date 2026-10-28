@@ -1,4 +1,4 @@
-import apiClient from './axiosInterceptor';
+import apiClient, { postKeepalive } from './axiosInterceptor';
 import { API_BASE_URL } from '../lib/api';
 
 // Interfaces matching the component expectations
@@ -97,21 +97,17 @@ export interface InstructorRevenueShare {
 class InstructorPayoutApiService {
   private readonly BASE_URL = `${API_BASE_URL}instructor-payout`;
 
-  // Record watch time (usually called from lecture progress tracking)
-  async recordWatchTime(courseId: number, lectureId: number, watchTime: number): Promise<void> {
+  // Record watch time (usually called from lecture progress tracking).
+  // Resolves to false when the server did not store it, so the caller can retry the same seconds.
+  async recordWatchTime(courseId: number, lectureId: number, watchTime: number, options?: { keepalive?: boolean }): Promise<boolean> {
+    const payload = { courseId, lectureId, watchTime }; // watchTime in seconds
+    if (options?.keepalive) {
+      return postKeepalive(`${this.BASE_URL}/watch-time/record`, payload);
+    }
     try {
-      console.log('📤 API Call - Recording watch time:', {
-        url: `${this.BASE_URL}/watch-time/record`,
-        payload: { courseId, lectureId, watchTime }
-      });
-      
-      const response = await apiClient.post(`${this.BASE_URL}/watch-time/record`, {
-        courseId,
-        lectureId,
-        watchTime // in seconds
-      });
-      
+      const response = await apiClient.post(`${this.BASE_URL}/watch-time/record`, payload);
       console.log('✅ API Response - Watch time recorded:', response.data);
+      return true;
     } catch (error: any) {
       console.error('❌ API Error recording watch time:', {
         error,
@@ -121,7 +117,7 @@ class InstructorPayoutApiService {
         lectureId,
         watchTime
       });
-      // Don't throw - watch time recording is not critical
+      return false;
     }
   }
 

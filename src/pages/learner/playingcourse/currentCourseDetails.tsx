@@ -51,7 +51,6 @@ export default function CourseDetailsPage() {
   const { user } = useAuth();
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [currentLectureProgress, setCurrentLectureProgress] = useState<LectureProgress | null>(null);
-  const [currentWatchSessionId, setCurrentWatchSessionId] = useState<number | null>(null);
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
   const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [certificateLoading, setCertificateLoading] = useState(false);
@@ -326,11 +325,26 @@ export default function CourseDetailsPage() {
   const lastPlayTimeRef = useRef<number | null>(null);
   const watchIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoCompletedRef = useRef<boolean>(false);
-  const lastReportTimeRef = useRef(0);
-  const lastUpdateTimeRef = useRef(0); // Separate ref for tracking last update time
-  const lastPayoutWatchTimeRef = useRef<number>(0); // Track last recorded watch time for payout
+  const lastUpdateTimeRef = useRef(0); // Last time pending watch time was flushed to the server
+  const lastTickWallRef = useRef<number | null>(null); // Wall clock (ms) of the last tracking tick
+  type TrackingContext = { courseId: number; sectionId: number; lectureId: number };
+  // Lecture currently being tracked; fixed when playback starts so a lecture switch can't misattribute time
+  const trackingCtxRef = useRef<TrackingContext | null>(null);
+  type PendingWatch = TrackingContext & {
+    progressSec: number; // not yet stored in LectureProgress
+    payoutSec: number; // not yet stored in InstructorWatchTime
+    position: number;
+    positionDirty: boolean;
+  };
+  const pendingWatchRef = useRef<Map<number, PendingWatch>>(new Map()); // keyed by lectureId
+  const watchSessionRef = useRef<{ idPromise: Promise<number | null>; watchedSec: number } | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const playbackRateRef = useRef(1);
   const [resolution, setResolution] = useState("Auto");
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+  }, [playbackRate]);
 
   const applyResolutionToHls = () => {
     if (playerRef.current) {
@@ -581,37 +595,36 @@ export default function CourseDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, courseData]); // Depend on both courseId and courseData to ensure progress loads when courseData is available
 
-  // Save progress on browser close/unload
+  // Persist watch time when the tab is hidden, closed or navigated away from, and when the player unmounts.
+  // The tracking functions only read refs, so the first-render versions captured here stay correct.
   useEffect(() => {
-    const handleBeforeUnload = async () => {
-      if (courseId && activeModule?.id && !isPlaying && (activeModule?.contentType === 'video' || activeModule?.contentType === 'lecture' || activeModule?.type === 'lecture')) {
-        try {
-          const courseIdNum = parseInt(courseId);
-          const lectureId = typeof activeModule.id === 'string' ? parseInt(activeModule.id) : activeModule.id;
-          const sectionId = typeof activeModule.sectionId === 'string' ? parseInt(activeModule.sectionId) : activeModule.sectionId;
-          const currentPosition = playerRef.current?.getCurrentTime() || currentTime || 0;
-          if (!isNaN(courseIdNum) && !isNaN(lectureId) && sectionId) {
-            // Use sendBeacon for reliable delivery on page unload
-            await progressApiService.updateLectureProgress({
-              courseId: courseIdNum,
-              sectionId: sectionId,
-              lectureId: lectureId,
-              currentPosition: currentPosition,
-              watchTime: totalWatched,
-              isCompleted: false
-            });
-          }
-        } catch (error) {
-          console.error('Error saving progress on unload:', error);
-        }
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        flushWatchTime({ keepalive: true });
       }
     };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+    const stopOnPageHide = () => {
+      stopWatchTimeTracking({ keepalive: true });
     };
-  }, [courseId, activeModule, isPlaying, currentTime, totalWatched]);
+
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    window.addEventListener('pagehide', stopOnPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      window.removeEventListener('pagehide', stopOnPageHide);
+      stopWatchTimeTracking({ keepalive: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Switching lectures ends tracking for the previous one so its time is never credited to the new lecture
+  useEffect(() => {
+    const ctx = trackingCtxRef.current;
+    if (ctx && activeModule?.id !== undefined && ctx.lectureId !== toNumericId(activeModule.id)) {
+      stopWatchTimeTracking();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeModule?.id]);
 
   const findNextModule = (currentSectionIndex: number, currentItemIndex: number) => {
     if (!enrichedCourseData?.curriculum?.sections) return null;
@@ -808,69 +821,6 @@ export default function CourseDetailsPage() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Initialize watch session tracking
-  useEffect(() => {
-    // Load any previously saved watch data from localStorage or your backend
-    const savedWatchTime = localStorage.getItem(`watchTime-${courseId}-${studentId}`);
-    if (savedWatchTime) {
-      const parsedWatchTime = parseFloat(savedWatchTime);
-      setTotalWatched(parsedWatchTime);
-      totalWatchedRef.current = parsedWatchTime;
-    }
-
-    // Set up periodic reporting of watch time
-    const reportInterval = setInterval(() => {
-      reportWatchTimeToServer();
-    }, 60000); // Report every minute
-
-    return () => {
-      clearInterval(reportInterval);
-      // Save watch time when component unmounts
-      saveWatchTime();
-    };
-  }, []);
-
-  // Save watch time to localStorage and potentially to your server
-  const saveWatchTime = () => {
-    // Save to localStorage as a backup
-    localStorage.setItem(`watchTime-${courseId}-${studentId}`, totalWatched.toString());
-
-    // Report final time to server
-    reportWatchTimeToServer(true);
-  };
-
-  // Report watch time to server
-  const reportWatchTimeToServer = (isFinal = false) => {
-    // Only report if there's new watch time to report
-    if (totalWatched > lastReportTimeRef.current) {
-      console.log(`Reporting watch time: ${formatTime(totalWatched)} ${isFinal ? '(final report)' : ''}`);
-
-      // Here you would make an API call to your backend
-      const watchTimeData = {
-        courseId,
-        instructorId,
-        studentId,
-        watchTime: totalWatched,
-        watchedSegments: watchedSegments,
-        completionPercentage: (totalWatched / duration) * 100,
-        timestamp: new Date().toISOString(),
-        isFinal
-      };
-
-      // Example API call (replace with your actual implementation)
-      // fetch('your-api-endpoint/report-watch-time', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(watchTimeData)
-      // });
-
-      console.log("Watch data to send:", watchTimeData);
-
-      // Update last report time
-      lastReportTimeRef.current = totalWatched;
-    }
-  };
-
   // Track which segments of the video have been watched
   const addWatchedSegment = (start: number, end: number) => {
     if (end <= start) return; // Prevent invalid segments
@@ -903,180 +853,221 @@ export default function CourseDetailsPage() {
     });
   };
 
-  // Start tracking watch time with precision
-  const startWatchTimeTracking = async () => {
-    if (watchIntervalRef.current) return; // Prevent multiple intervals
+  const WATCH_FLUSH_INTERVAL_MS = 10000;
 
-    if (!activeModule?.id || !courseId) return;
+  function toNumericId(value: any): number {
+    return typeof value === 'string' ? parseInt(value, 10) : Number(value);
+  }
 
-    const startTime = playerRef.current?.getCurrentTime() || currentTime || 0;
-    lastPlayTimeRef.current = startTime;
-
-    try {
-      const courseIdNum = parseInt(courseId);
-      if (!isNaN(courseIdNum) && activeModule.sectionId) {
-        // Start watch session via API
-        const sessionId = await progressApiService.startWatchSession({
-          courseId: courseIdNum,
-          sectionId: activeModule.sectionId,
-          lectureId: activeModule.id,
-          startPosition: startTime
-        });
-        setCurrentWatchSessionId(sessionId);
-      }
-    } catch (error) {
-      console.error('Error starting watch session:', error);
-    }
-
-    // Record start of a new watch session locally
-    const newSession = {
-      start: startTime,
-      startedAt: new Date().toISOString()
-    };
-
-    setWatchSessions(prev => [...prev, newSession]);
-
-    // Update every 5 seconds while playing (reduced frequency for API calls)
-    watchIntervalRef.current = setInterval(async () => {
-      if (!playerRef.current || !activeModule?.id || !courseId) return;
-
-      const currentPosition = playerRef.current.getCurrentTime();
-
-      // Add to watched segments (for analytics on which parts were watched)
-      if (lastPlayTimeRef.current !== null) {
-        addWatchedSegment(lastPlayTimeRef.current, currentPosition);
-      }
-
-      // Update total watched time based on actual position difference
-      // Don't increment blindly - use the actual position change
-      if (lastPlayTimeRef.current !== null) {
-        const timeDiff = currentPosition - lastPlayTimeRef.current;
-        if (timeDiff > 0 && timeDiff < 2) { // Only count forward progress, max 2 seconds per update
-          const newTotal = totalWatchedRef.current + timeDiff;
-          const cappedTotal = duration > 0 ? Math.min(newTotal, duration) : newTotal;
-          totalWatchedRef.current = cappedTotal;
-          setTotalWatched(cappedTotal);
-        }
-      }
-      lastPlayTimeRef.current = currentPosition;
-
-      // Update lecture progress every 10 seconds (reduced from 30 for short videos)
-      // This ensures watch time is recorded even for videos shorter than 30 seconds
-      const now = Date.now();
-      const lastUpdate = lastUpdateTimeRef.current;
-      if (now - lastUpdate >= 10000) { // Changed from 30000 to 10000 (10 seconds)
-        lastUpdateTimeRef.current = now;
-        try {
-          const courseIdNum = parseInt(courseId);
-          const lectureId = typeof activeModule.id === 'string'
-            ? parseInt(activeModule.id)
-            : activeModule.id;
-          const sectionId = typeof activeModule.sectionId === 'string'
-            ? parseInt(activeModule.sectionId)
-            : activeModule.sectionId;
-
-          if (!isNaN(courseIdNum) && sectionId && !isNaN(lectureId)) {
-            // Calculate incremental watch time since last payout recording
-            const incrementalWatchTime = Math.floor(totalWatchedRef.current - lastPayoutWatchTimeRef.current);
-
-            try {
-              if (incrementalWatchTime > 0) {
-                try {
-                  await progressApiService.updateLectureProgress({
-                    courseId: courseIdNum,
-                    sectionId: sectionId,
-                    lectureId: lectureId,
-                    currentPosition: currentPosition,
-                    watchTime: incrementalWatchTime, // Send delta to prevent quadratic growth
-                    isCompleted: false
-                  });
-                } catch (progressError) {
-                  console.warn('Student progress failed, but continuing to record payout...', progressError);
-                }
-
-                // Update last recorded watch time immediately after progress API succeeds
-                // to prevent double-counting if instructor payout API fails
-                lastPayoutWatchTimeRef.current = totalWatchedRef.current;
-
-                // Record incremental watch time for minute categorization and instructor payout
-                try {
-                  await instructorPayoutApiService.recordWatchTime(courseIdNum, lectureId, incrementalWatchTime);
-                } catch (watchTimeError) {
-                  console.error('Error recording watch time:', watchTimeError);
-                }
-              } else {
-                try {
-                  await progressApiService.updateLectureProgress({
-                    courseId: courseIdNum,
-                    sectionId: sectionId,
-                    lectureId: lectureId,
-                    currentPosition: currentPosition,
-                    watchTime: 0,
-                    isCompleted: false
-                  });
-                } catch (progressError) {
-                  console.warn('Student progress failed (zero incremental time)', progressError);
-                }
-              }
-
-              // After updating lecture progress, refresh overall progress to ensure it's up to date
-              // This ensures progress percentage is recalculated based on watch time
-              const updatedProgress = await progressApiService.getProgress(courseIdNum);
-              if (updatedProgress) {
-                setProgress(updatedProgress);
-                // Merge progress into courseData to update UI
-                const baseData = courseData || enrichedCourseData;
-                if (baseData) {
-                  const enrichedCourse = mergeProgressWithCourse(baseData, updatedProgress);
-                  setEnrichedCourseData(enrichedCourse);
-                }
-              }
-            } catch (error) {
-              console.error('Error updating lecture progress:', error);
-            }
-          }
-        } catch (error) {
-          console.error('Error in watch time tracking interval:', error);
-        }
-      }
-    }, 1000); // Check every second, but only update API every 30 seconds (optimized)
+  const getTrackingContext = (): TrackingContext | null => {
+    if (!courseId || activeModule?.id === undefined || activeModule?.id === null) return null;
+    const courseIdNum = parseInt(courseId, 10);
+    const lectureId = toNumericId(activeModule.id);
+    const sectionId = toNumericId(
+      activeModule.sectionId ?? enrichedCourseData?.curriculum?.sections?.[activeModule.sectionIndex]?.id
+    );
+    if (isNaN(courseIdNum) || isNaN(lectureId) || isNaN(sectionId) || !sectionId) return null;
+    return { courseId: courseIdNum, sectionId, lectureId };
   };
 
-  // Stop tracking watch time
-  const stopWatchTimeTracking = async () => {
-    if (!watchIntervalRef.current) return;
+  const addPendingWatch = (ctx: TrackingContext, seconds: number, position: number) => {
+    let entry = pendingWatchRef.current.get(ctx.lectureId);
+    if (!entry) {
+      entry = { ...ctx, progressSec: 0, payoutSec: 0, position, positionDirty: false };
+      pendingWatchRef.current.set(ctx.lectureId, entry);
+    }
+    entry.progressSec += seconds;
+    entry.payoutSec += seconds;
+    entry.position = position;
+    entry.positionDirty = true;
+  };
 
-    clearInterval(watchIntervalRef.current);
-    watchIntervalRef.current = null;
+  // Sends all unsent watch seconds (lecture progress + instructor/learner minutes ledger).
+  // Amounts are taken out of the buffer before sending and put back on failure, so a failed or
+  // overlapping request never loses or double-counts time.
+  const flushWatchTime = async (options?: { keepalive?: boolean }) => {
+    const keepalive = options?.keepalive ?? false;
+    const entries = Array.from(pendingWatchRef.current.values());
 
-    // Complete the current watch session
-    if (lastPlayTimeRef.current !== null && currentWatchSessionId) {
-      const currentPosition = playerRef.current?.getCurrentTime() || lastPlayTimeRef.current;
-      const watchTime = Math.floor(currentPosition - (watchSessions[watchSessions.length - 1]?.start || 0));
+    await Promise.all(entries.map(async (entry) => {
+      const progressSec = Math.floor(entry.progressSec * 100) / 100;
+      const payoutSec = Math.floor(entry.payoutSec * 100) / 100;
+      const sendProgress = progressSec > 0 || entry.positionDirty;
+      const position = entry.position;
 
-      try {
-        // End watch session via API
-        await progressApiService.endWatchSession({
-          sessionId: currentWatchSessionId,
-          endPosition: currentPosition,
-          watchTime: watchTime
-        });
-        setCurrentWatchSessionId(null);
-      } catch (error) {
-        console.error('Error ending watch session:', error);
+      entry.progressSec -= progressSec;
+      entry.payoutSec -= payoutSec;
+      entry.positionDirty = false;
+
+      const requests: Promise<void>[] = [];
+
+      if (sendProgress) {
+        const data = {
+          courseId: entry.courseId,
+          sectionId: entry.sectionId,
+          lectureId: entry.lectureId,
+          currentPosition: position,
+          watchTime: progressSec,
+          isCompleted: false,
+        };
+        requests.push((async () => {
+          let ok: boolean;
+          if (keepalive) {
+            ok = await progressApiService.updateLectureProgressKeepalive(data);
+          } else {
+            ok = await progressApiService.updateLectureProgress(data).then(() => true, () => false);
+          }
+          if (!ok) {
+            entry.progressSec += progressSec;
+            entry.positionDirty = true;
+          }
+        })());
       }
 
+      if (payoutSec > 0) {
+        requests.push((async () => {
+          const ok = await instructorPayoutApiService.recordWatchTime(entry.courseId, entry.lectureId, payoutSec, { keepalive });
+          if (!ok) {
+            entry.payoutSec += payoutSec;
+          }
+        })());
+      }
+
+      await Promise.all(requests);
+    }));
+  };
+
+  const refreshCourseProgress = async (courseIdNum: number) => {
+    try {
+      const updatedProgress = await progressApiService.getProgress(courseIdNum);
+      if (updatedProgress) {
+        setProgress(updatedProgress);
+        const baseData = courseData || enrichedCourseData;
+        if (baseData) {
+          setEnrichedCourseData(mergeProgressWithCourse(baseData, updatedProgress));
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing course progress:', error);
+    }
+  };
+
+  // Called every second while playing. Counts forward playback that is plausible for the elapsed wall-clock
+  // time at the current speed; seeks/skips jump further than that and are ignored. Background tabs whose
+  // timers are throttled still count because the allowance grows with the elapsed time.
+  const trackWatchTick = () => {
+    const ctx = trackingCtxRef.current;
+    const player = playerRef.current;
+    if (!ctx || !player) return;
+
+    const position = player.getCurrentTime();
+    if (typeof position !== 'number' || isNaN(position)) return;
+
+    const now = Date.now();
+    const prevPosition = lastPlayTimeRef.current;
+    const prevTick = lastTickWallRef.current;
+    lastPlayTimeRef.current = position;
+    lastTickWallRef.current = now;
+
+    if (prevPosition !== null && prevTick !== null) {
+      const advanced = position - prevPosition;
+      const elapsedSec = (now - prevTick) / 1000;
+      const maxPlausible = elapsedSec * Math.max(playbackRateRef.current, 1) + 1.5;
+      if (advanced > 0 && advanced <= maxPlausible) {
+        addPendingWatch(ctx, advanced, position);
+        addWatchedSegment(prevPosition, position);
+        if (watchSessionRef.current) {
+          watchSessionRef.current.watchedSec += advanced;
+        }
+        totalWatchedRef.current += advanced;
+        setTotalWatched(totalWatchedRef.current);
+      }
+    }
+
+    if (now - lastUpdateTimeRef.current >= WATCH_FLUSH_INTERVAL_MS) {
+      lastUpdateTimeRef.current = now;
+      flushWatchTime().then(() => refreshCourseProgress(ctx.courseId));
+    }
+  };
+
+  // Start tracking watch time for the active lecture
+  const startWatchTimeTracking = () => {
+    if (watchIntervalRef.current) return; // Prevent multiple intervals
+
+    const ctx = getTrackingContext();
+    if (!ctx) {
+      console.warn('Watch time not tracked: missing course/section/lecture id', { courseId, activeModule });
+      return;
+    }
+
+    const startPosition = playerRef.current?.getCurrentTime() || currentTime || 0;
+    trackingCtxRef.current = ctx;
+    lastPlayTimeRef.current = startPosition;
+    lastTickWallRef.current = Date.now();
+    lastUpdateTimeRef.current = Date.now();
+
+    watchSessionRef.current = {
+      watchedSec: 0,
+      idPromise: progressApiService
+        .startWatchSession({ ...ctx, startPosition })
+        .then((id) => id || null)
+        .catch((error) => {
+          console.error('Error starting watch session:', error);
+          return null;
+        }),
+    };
+    setWatchSessions(prev => [...prev, { start: startPosition, startedAt: new Date().toISOString() }]);
+
+    watchIntervalRef.current = setInterval(trackWatchTick, 1000);
+  };
+
+  // Stop tracking: capture the last partial second, save the resume position, flush everything and close the session
+  const stopWatchTimeTracking = async (options?: { keepalive?: boolean }) => {
+    const ctx = trackingCtxRef.current;
+
+    if (watchIntervalRef.current) {
+      trackWatchTick();
+      clearInterval(watchIntervalRef.current);
+      watchIntervalRef.current = null;
+    }
+
+    const endPosition = lastPlayTimeRef.current ?? 0;
+    if (ctx) {
+      addPendingWatch(ctx, 0, endPosition);
+    }
+    trackingCtxRef.current = null;
+    lastPlayTimeRef.current = null;
+    lastTickWallRef.current = null;
+
+    const session = watchSessionRef.current;
+    watchSessionRef.current = null;
+
+    const flushPromise = flushWatchTime(options);
+
+    if (session) {
       setWatchSessions(prev => {
         const sessions = [...prev];
         const lastSession = sessions[sessions.length - 1];
         if (lastSession && !lastSession.end) {
-          lastSession.end = currentPosition;
+          lastSession.end = endPosition;
           lastSession.endedAt = new Date().toISOString();
-          lastSession.duration = currentPosition - lastSession.start;
+          lastSession.duration = session.watchedSec;
         }
         return sessions;
       });
+
+      const sessionId = await session.idPromise;
+      if (sessionId) {
+        const data = { sessionId, endPosition, watchTime: Math.round(session.watchedSec) };
+        if (options?.keepalive) {
+          await progressApiService.endWatchSessionKeepalive(data);
+        } else {
+          await progressApiService.endWatchSession(data).catch(() => undefined);
+        }
+      }
     }
+
+    await flushPromise;
   };
 
 
@@ -1089,134 +1080,76 @@ export default function CourseDetailsPage() {
 
   const handlePause = () => {
     setIsPlaying(false);
+    // Flushes the remaining watch time and saves the resume position
     stopWatchTimeTracking();
-    // Persist current position on pause for resume
-    try {
-      if (courseId && activeModule?.id && (activeModule?.contentType === 'video' || activeModule?.contentType === 'lecture' || activeModule?.type === 'lecture')) {
-        const courseIdNum = parseInt(courseId);
-        const lectureId = typeof activeModule.id === 'string' ? parseInt(activeModule.id) : activeModule.id;
-        const sectionId = typeof activeModule.sectionId === 'string' ? parseInt(activeModule.sectionId) : activeModule.sectionId;
-        const currentPosition = playerRef.current?.getCurrentTime() || currentTime || 0;
-        if (!isNaN(courseIdNum) && !isNaN(lectureId) && sectionId) {
-          progressApiService.updateLectureProgress({
-            courseId: courseIdNum,
-            sectionId: sectionId,
-            lectureId: lectureId,
-            currentPosition: currentPosition,
-            watchTime: 0,
-            isCompleted: false
-          });
-        }
-      }
-    } catch { }
   };
 
   const handleEnded = async () => {
-    console.log('🎬 Video ended - handleEnded called', {
-      totalWatched,
-      courseData: courseData?.pricing,
-      activeModule: activeModule?.id,
-      courseId
-    });
-
     // Prevent multiple calls
     if (videoCompletedRef.current) {
-      console.log('⏭️ Video already marked as completed, skipping');
       return;
     }
     videoCompletedRef.current = true;
 
+    const ctx = trackingCtxRef.current ?? getTrackingContext();
     setIsPlaying(false);
+    // Sends the watch time played since the last flush; only real playback is counted, never the full duration
     await stopWatchTimeTracking();
 
     // Mark lecture as completed
-    if (activeModule?.id && courseId && activeModule.sectionId) {
+    if (ctx) {
       try {
-        const courseIdNum = parseInt(courseId);
-        const lectureId = typeof activeModule.id === 'string'
-          ? parseInt(activeModule.id)
-          : activeModule.id;
-        const sectionId = typeof activeModule.sectionId === 'string'
-          ? parseInt(activeModule.sectionId)
-          : activeModule.sectionId;
+        const courseIdNum = ctx.courseId;
+        await progressApiService.updateLectureProgress({
+          ...ctx,
+          currentPosition: duration || 0,
+          watchTime: 0,
+          isCompleted: true
+        });
 
-        if (!isNaN(courseIdNum) && sectionId && !isNaN(lectureId)) {
-          // Update lecture progress as completed
-          await progressApiService.updateLectureProgress({
-            courseId: courseIdNum,
-            sectionId: sectionId,
-            lectureId: lectureId,
-            currentPosition: duration || 0,
-            watchTime: totalWatched,
-            isCompleted: true
-          });
+        // Get section and item seqNo for progress update
+        const section = enrichedCourseData?.curriculum?.sections?.[activeModule.sectionIndex || 0];
+        const item = section?.items?.[activeModule.itemIndex || 0];
+        const sectionSeqNo = section?.seqNo ?? ((activeModule.sectionIndex || 0) + 1);
+        const itemSeqNo = item?.seqNo ?? ((activeModule.itemIndex || 0) + 1);
 
-          // Record final incremental watch time for minute categorization and instructor payout
-          // Always record any remaining watch time when video ends, even if less than 30 seconds
-          // Use the actual video duration or totalWatched, whichever is higher
-          const finalWatchTime = Math.max(totalWatched, duration || 0);
-          const finalIncrementalWatchTime = Math.floor(finalWatchTime - lastPayoutWatchTimeRef.current);
+        // Update overall progress
+        await progressApiService.updateProgress({
+          courseId: courseIdNum,
+          sectionIndex: sectionSeqNo, // Use seqNo instead of array index
+          lectureIndex: itemSeqNo, // Use seqNo instead of array index
+          isCompleted: true
+        });
 
-          // Record any remaining watch time when video ends (no minimum threshold)
-          // For very short videos, record the full duration if no incremental time was recorded
-          const watchTimeToRecord = finalIncrementalWatchTime > 0 ? finalIncrementalWatchTime : 0;
+        // Reload progress and update UI
+        const updated = await progressApiService.getProgress(courseIdNum);
+        if (updated) {
+          setProgress(updated);
+          const baseData = courseData || enrichedCourseData;
+          const enriched = mergeProgressWithCourse(baseData, updated);
+          setEnrichedCourseData(enriched);
 
-          if (watchTimeToRecord > 0) {
+          // Check if course is 100% completed
+          if (updated.progress >= 100) {
+            setShowCompletionMessage(true);
+            // Generate certificate if not already exists
             try {
-              await instructorPayoutApiService.recordWatchTime(courseIdNum, lectureId, watchTimeToRecord);
-              lastPayoutWatchTimeRef.current = finalWatchTime; // Update last recorded watch time
-            } catch (watchTimeError) {
-              console.error('Error recording final watch time:', watchTimeError);
-            }
-          }
-
-          // Get section and item seqNo for progress update
-          const section = enrichedCourseData?.curriculum?.sections?.[activeModule.sectionIndex || 0];
-          const item = section?.items?.[activeModule.itemIndex || 0];
-          const sectionSeqNo = section?.seqNo ?? ((activeModule.sectionIndex || 0) + 1);
-          const itemSeqNo = item?.seqNo ?? ((activeModule.itemIndex || 0) + 1);
-
-          // Update overall progress
-          await progressApiService.updateProgress({
-            courseId: courseIdNum,
-            sectionIndex: sectionSeqNo, // Use seqNo instead of array index
-            lectureIndex: itemSeqNo, // Use seqNo instead of array index
-            isCompleted: true
-          });
-
-          // Reload progress and update UI
-          const updated = await progressApiService.getProgress(courseIdNum);
-          if (updated) {
-            setProgress(updated);
-            const baseData = courseData || enrichedCourseData;
-            const enriched = mergeProgressWithCourse(baseData, updated);
-            setEnrichedCourseData(enriched);
-
-            // Check if course is 100% completed
-            if (updated.progress >= 100) {
-              setShowCompletionMessage(true);
-              // Generate certificate if not already exists
-              try {
-                const courseIdNum = parseInt(courseId);
-                if (!isNaN(courseIdNum)) {
-                  const existingCert = await certificateApiService.getCertificateByCourse(courseIdNum);
-                  if (!existingCert || !existingCert.id) {
-                    // Generate new certificate
-                    const newCert = await certificateApiService.generateCertificate({ courseId: courseIdNum });
-                    if (newCert && newCert.id) {
-                      console.log('Generated new certificate with ID:', newCert.id);
-                      setCertificate(newCert);
-                    } else {
-                      console.error('Failed to generate certificate: missing ID');
-                    }
-                  } else {
-                    console.log('Using existing certificate with ID:', existingCert.id);
-                    setCertificate(existingCert);
-                  }
+              const existingCert = await certificateApiService.getCertificateByCourse(courseIdNum);
+              if (!existingCert || !existingCert.id) {
+                // Generate new certificate
+                const newCert = await certificateApiService.generateCertificate({ courseId: courseIdNum });
+                if (newCert && newCert.id) {
+                  console.log('Generated new certificate with ID:', newCert.id);
+                  setCertificate(newCert);
+                } else {
+                  console.error('Failed to generate certificate: missing ID');
                 }
-              } catch (error) {
-                console.error('Error generating certificate:', error);
+              } else {
+                console.log('Using existing certificate with ID:', existingCert.id);
+                setCertificate(existingCert);
               }
+            } catch (error) {
+              console.error('Error generating certificate:', error);
             }
           }
         }
@@ -1224,8 +1157,6 @@ export default function CourseDetailsPage() {
         console.error('Error marking lecture as completed:', error);
       }
     }
-
-    console.log("Video completed");
 
     // Auto-play next video
     const nextModule = findNextModule(activeModule?.sectionIndex || 0, activeModule?.itemIndex || 0);
@@ -1238,23 +1169,16 @@ export default function CourseDetailsPage() {
         setCurrentTime(0);
         setTotalWatched(0);
         totalWatchedRef.current = 0;
-        lastPayoutWatchTimeRef.current = 0;
         setIsPlaying(true);
       }, 1000);
     }
   };
 
   const handleSeek = (seconds: number) => {
-    if (isPlaying) {
-      // If seeking while playing, stop current tracking and start a new session
-      stopWatchTimeTracking();
-
-      // Small delay to ensure the player has actually moved to the new position
-      setTimeout(() => {
-        if (isPlaying) {
-          startWatchTimeTracking();
-        }
-      }, 100);
+    // Re-baseline so the jump itself is never counted as watched time
+    if (watchIntervalRef.current) {
+      lastPlayTimeRef.current = seconds;
+      lastTickWallRef.current = Date.now();
     }
 
     // Update current time for UI
@@ -1370,23 +1294,12 @@ export default function CourseDetailsPage() {
             volume={isMuted ? 0 : volume}
             onProgress={({ playedSeconds }) => {
               setCurrentTime(playedSeconds);
-              // Update watch time based on actual video position, not just incrementing
-              if (isPlaying && lastPlayTimeRef.current !== null) {
-                const timeDiff = playedSeconds - lastPlayTimeRef.current;
-                if (timeDiff > 0 && timeDiff < 2) { // Only count forward progress, max 2 seconds per update
-                  const cappedTotal = Math.min(totalWatchedRef.current + timeDiff, duration || Infinity);
-                  totalWatchedRef.current = cappedTotal;
-                  setTotalWatched(cappedTotal);
-                }
-              }
-              lastPlayTimeRef.current = playedSeconds;
             }}
             onDuration={(dur) => {
               setDuration(dur);
               // Reset total watched when duration changes (new video)
               setTotalWatched(0);
               totalWatchedRef.current = 0;
-              lastPayoutWatchTimeRef.current = 0;
               // Reset video completed flag when duration changes (new video)
               videoCompletedRef.current = false;
             }}
@@ -1643,7 +1556,6 @@ export default function CourseDetailsPage() {
                     setCurrentTime(0);
                     setTotalWatched(0);
                     totalWatchedRef.current = 0;
-                    lastPayoutWatchTimeRef.current = 0;
                     setIsPlaying(true);
                   }}
                   className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-semibold transition-colors"

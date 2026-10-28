@@ -274,11 +274,11 @@ export const CourseWatchTime = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {course.lastAccessed.toLocaleDateString('en-GB', {
+                        {course.lastAccessed ? course.lastAccessed.toLocaleDateString('en-GB', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric'
-                        })}
+                        }) : '—'}
                       </TableCell>
                       <TableCell>
                         <button

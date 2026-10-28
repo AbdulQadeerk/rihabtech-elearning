@@ -79,4 +79,23 @@ apiClient.interceptors.response.use(
   }
 );
 
+// POST that survives page unload (tab close / navigation), which axios requests do not
+export const postKeepalive = async (url: string, body: unknown): Promise<boolean> => {
+  try {
+    const token = getAuthToken();
+    const response = await fetch(url, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
 export default apiClient;

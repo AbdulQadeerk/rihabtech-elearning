@@ -12,7 +12,7 @@ export interface CourseWatchTimeData {
   totalStudents: number;
   averageWatchTime: number; // in minutes
   completionRate: number; // percentage
-  lastAccessed: Date;
+  lastAccessed?: Date | null;
   isPaid?: boolean;
   pricingType?: 'paid' | 'free';
   watchTimeByMonth: { [month: string]: number };
@@ -35,12 +35,29 @@ class CourseWatchTimeService {
   private USERS_COLLECTION = 'users';
 
   // Get course-wise watch time data for an instructor
-  async getCourseWatchTimeData(instructorId: string, pricingType?: string): Promise<CourseWatchTimeData[]> {
+  async getCourseWatchTimeData(
+    instructorId: string,
+    pricingType?: string,
+    year?: number | string | null,
+    month?: number | string | null
+  ): Promise<CourseWatchTimeData[]> {
     try {
-      console.log(`Fetching course watch time data for instructor: ${instructorId}, filter: ${pricingType}`);
+      console.log(`Fetching course watch time data for instructor: ${instructorId}, filter: ${pricingType}, year: ${year}, month: ${month}`);
 
-      const params = pricingType && pricingType !== 'all' ? `?pricingType=${pricingType}` : '';
-      // Call the new API endpoint
+      const queryParams = new URLSearchParams();
+      if (pricingType && pricingType !== 'all') {
+        queryParams.append('pricingType', pricingType);
+      }
+      if (year && year !== 'all') {
+        queryParams.append('year', String(year));
+      }
+      if (month && month !== 'all') {
+        queryParams.append('month', String(month));
+      }
+
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+      // Call the API endpoint
       const response = await apiService.get<Array<{
         courseId: number;
         courseTitle: string;
@@ -50,10 +67,10 @@ class CourseWatchTimeService {
         totalStudents: number;
         averageWatchTime: number;
         completionRate: number;
-        lastAccessed: string;
+        lastAccessed?: string | null;
         isPaid?: boolean;
         pricingType?: 'paid' | 'free';
-      }>>(`${API_BASE_URL}instructor/dashboard/course-watch-time${params}`);
+      }>>(`${API_BASE_URL}instructor/dashboard/course-watch-time${queryString}`);
 
       return response.map(item => ({
         courseId: item.courseId.toString(),
@@ -64,7 +81,7 @@ class CourseWatchTimeService {
         totalStudents: item.totalStudents || 0,
         averageWatchTime: item.averageWatchTime || 0,
         completionRate: item.completionRate || 0,
-        lastAccessed: new Date(item.lastAccessed),
+        lastAccessed: item.lastAccessed ? new Date(item.lastAccessed) : null,
         isPaid: item.isPaid !== false,
         pricingType: item.pricingType || (item.isPaid === false ? 'free' : 'paid'),
         watchTimeByMonth: {} // Can be populated if needed

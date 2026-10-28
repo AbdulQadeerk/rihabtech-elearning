@@ -1,4 +1,4 @@
-import apiClient from './axiosInterceptor';
+import apiClient, { postKeepalive } from './axiosInterceptor';
 import { API_BASE_URL } from '../lib/api';
 
 export interface StudentProgress {
@@ -167,6 +167,13 @@ class ProgressApiService {
   }
 
   /**
+   * Update lecture progress with a request that survives page unload
+   */
+  updateLectureProgressKeepalive(data: UpdateLectureProgressRequest): Promise<boolean> {
+    return postKeepalive(`${this.LECTURE_PROGRESS_URL}/update`, data);
+  }
+
+  /**
    * Get all lecture progress for a course
    */
   async getCourseLectureProgress(courseId: number): Promise<LectureProgress[]> {
@@ -201,11 +208,11 @@ class ProgressApiService {
    */
   async startWatchSession(data: StartWatchSessionRequest): Promise<number> {
     try {
-      const response = await apiClient.post<{ Success: boolean; SessionId: number }>(
+      const response = await apiClient.post<{ success: boolean; sessionId: number }>(
         `${this.WATCH_SESSION_URL}/start`,
         data
       );
-      return response.data.SessionId;
+      return response.data.sessionId;
     } catch (error: any) {
       console.error('Error starting watch session:', error);
       throw error;
@@ -222,6 +229,13 @@ class ProgressApiService {
       console.error('Error ending watch session:', error);
       throw error;
     }
+  }
+
+  /**
+   * End a watch session with a request that survives page unload
+   */
+  endWatchSessionKeepalive(data: EndWatchSessionRequest): Promise<boolean> {
+    return postKeepalive(`${this.WATCH_SESSION_URL}/end`, data);
   }
 
   /**
