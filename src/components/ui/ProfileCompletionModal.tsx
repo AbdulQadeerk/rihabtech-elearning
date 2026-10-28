@@ -18,6 +18,7 @@ interface ProfileCompletionModalProps {
 
 const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userName, userEmail, onComplete }) => {
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [phoneCountry, setPhoneCountry] = useState('IN');
 
   const formik = useFormik({
@@ -51,6 +52,7 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userNam
     }),
     onSubmit: async (values) => {
       setLoading(true);
+      setServerError(null);
       try {
         await axiosClient.post('/update-profile', {
           name: values.name,
@@ -75,7 +77,37 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userNam
         toast.success('Profile completed successfully! Welcome aboard!');
         onComplete();
       } catch (error: any) {
-        toast.error(error.response?.data?.message || 'Failed to update profile. Please try again.');
+        let errorMsg = 'Failed to update profile. Please try again.';
+        const resData = error.response?.data;
+        if (typeof resData === 'string' && resData.trim()) {
+          try {
+            const parsed = JSON.parse(resData);
+            errorMsg = parsed.message || parsed.error || resData;
+          } catch {
+            errorMsg = resData;
+          }
+        } else if (typeof resData === 'object' && resData !== null) {
+          errorMsg = resData.message || resData.error || (Array.isArray(resData.errors) ? resData.errors[0] : null) || errorMsg;
+        } else if (error.message) {
+          errorMsg = error.message;
+        }
+
+        const isDuplicateMobile =
+          errorMsg.toLowerCase().includes('mobile') ||
+          errorMsg.toLowerCase().includes('phone') ||
+          errorMsg.toLowerCase().includes('already registered') ||
+          errorMsg.toLowerCase().includes('already exists');
+
+        if (isDuplicateMobile) {
+          const customMsg = 'This mobile number is already registered with another account. Please enter a different number or sign in with that account.';
+          formik.setFieldError('phone', customMsg);
+          formik.setFieldTouched('phone', true, false);
+          setServerError(customMsg);
+          toast.error(customMsg);
+        } else {
+          setServerError(errorMsg);
+          toast.error(errorMsg);
+        }
       } finally {
         setLoading(false);
       }
@@ -143,6 +175,7 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userNam
               value={formik.values.phone}
               onChange={(value, country) => {
                 formik.setFieldValue('phone', value);
+                if (serverError) setServerError(null);
                 const c = country as { iso2?: string };
                 if (c && c.iso2) {
                   setPhoneCountry(c.iso2.toUpperCase());
@@ -210,6 +243,16 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userNam
             )}
           </div>
 
+          {/* Server Error Alert Banner */}
+          {serverError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2.5 text-sm text-red-700 animate-in fade-in duration-200">
+              <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{serverError}</span>
+            </div>
+          )}
+
           {/* Submit Button */}
           <Button
             type="submit"
@@ -225,6 +268,22 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userNam
               'Complete Profile & Continue'
             )}
           </Button>
+
+          {/* Switch Account / Logout Option */}
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.setItem('logoutSuccess', 'true');
+                window.location.replace('/#/login');
+                window.location.reload();
+              }}
+              className="text-xs text-gray-500 hover:text-gray-800 underline transition-colors"
+            >
+              Already have an account? Sign out and log in
+            </button>
+          </div>
         </form>
       </div>
     </div>
